@@ -1,0 +1,6 @@
+{
+  "name": "ASiS VPN",
+  "description": "ASiS VPN — Commercial multi-platform VPN client, gateway architecture, and bilingual RTL/LTR design system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
