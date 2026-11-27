@@ -38,3 +38,18 @@
 - [ ] Light & Dark theme contrast audit (WCAG AA)
 
 > **Rule**: A green web build or UI preview is never accepted as proof of a functioning VPN tunnel.
+
+## 3. First real run after steps 42 - 45 (design pass)
+
+Nothing from 0.4.28 - 0.4.30 was type-checked, built or rendered where it was written (no `node_modules`). Do this once, in order, and stop at the first failure:
+
+1. `npm run check` — runs `tsc --noEmit`, `npm test` and `vite build`. If `tsc` fails, the likely places are `src/signupLink.ts`, `src/features/subscriptions/planSummary.ts`, `LoginScreen.tsx`, `SubscriptionsView.tsx`, `StatisticsView.tsx`, `ConnectionButton.tsx`. Send the first error.
+2. `npm run build && npm run preview`, open the page in the browser, DevTools device mode at **360, 390 and 430 px wide**, then desktop. Compare each screen with `docs/design/reference.png`:
+   - **Login:** logo glow, two fields with icons, "ورود", skyline at the bottom. With `VITE_SIGNUP_URL=https://example.com` set at build time the "ثبت‌نام در حساب کاربری" link appears (password mode only); without it, it is hidden.
+   - **Home:** green "متصل هستید" pill, timer, dotted map, download/upload cards, server card, Power button. Idle = dark disc + neon ring; connected = green. Check the ring and glow are not too strong or too weak.
+   - **Servers:** tabs, rows with flag / ping / star, fixed "اتصال به سرور" button not hidden by the bottom bar.
+   - **Subscriptions:** plan line (`700 GB | 180 Days` only if the panel gives size and dates), usage ring, expiry date in Persian calendar, "افزودن اشتراک جدید" switches to the import tab.
+   - **Statistics:** daily / weekly / monthly tabs, bar chart, download + upload pair, and the large "مصرف کل" card under them.
+   - **Settings:** unified list, switches, support row.
+3. Watch the browser Console on every screen for errors.
+4. Android: push and read the first CI build log (first real compile of the Java from 0.4.20 - 0.4.27), then check on a device: foreground notification, the notification permission dialog (Android 13+), service type on Android 14+, server delays after connect.

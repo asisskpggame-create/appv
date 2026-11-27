@@ -9,7 +9,7 @@ interface ThemePaletteSwitcherProps {
   variant?: 'popover' | 'panel';
 }
 
-const PALETTE_ORDER: ThemePalette[] = ['azure', 'emerald', 'titanium'];
+const PALETTE_ORDER: ThemePalette[] = ['azure', 'violet', 'emerald', 'titanium'];
 
 export function ThemePaletteSwitcher({ variant = 'popover' }: ThemePaletteSwitcherProps) {
   const { theme, themePreference, setThemePreference, palette, setPalette, locale } =
@@ -88,7 +88,7 @@ export function ThemePaletteSwitcher({ variant = 'popover' }: ThemePaletteSwitch
                 onClick={() => setPalette(id)}
                 className={`group flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-start transition-all duration-150 cursor-pointer ${
                   selected
-                    ? 'border-[var(--asis-primary-border)] bg-[var(--asis-primary-soft)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+                    ? 'border-[var(--asis-primary-border)] bg-[var(--asis-primary-soft)]'
                     : 'border-[var(--asis-border)] bg-[var(--asis-surface-2)]/50 hover:border-[var(--asis-border-strong)] hover:bg-[var(--asis-surface-2)]'
                 }`}
               >

@@ -484,7 +484,7 @@ export function AsisClientShell() {
         onClick={() => setScreen(item.id)}
         className={`group relative flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm font-medium transition-all duration-150 cursor-pointer whitespace-nowrap ${
           active
-            ? 'border-[var(--asis-primary-border)] bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+            ? 'border-[var(--asis-primary-border)] bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)] font-semibold'
             : 'border-transparent text-[var(--asis-text-secondary)] hover:translate-x-0.5 rtl:hover:-translate-x-0.5 hover:bg-[var(--asis-surface-2)] hover:text-[var(--asis-text-primary)]'
         }`}
       >
@@ -587,11 +587,11 @@ export function AsisClientShell() {
       </aside>
 
       {/* Main Viewport */}
-      <div className="asis-canvas-ambient flex flex-1 flex-col min-w-0 pb-24 md:pb-0">
+      <div className="asis-canvas-ambient flex flex-1 flex-col min-w-0 pb-32 md:pb-0">
         {/* Top Bar */}
         <header className="sticky top-0 z-30 hidden md:flex items-center justify-between gap-4 border-b border-[var(--asis-border)] bg-[var(--asis-chrome)]/85 px-6 py-3.5 backdrop-blur-md">
           <div className="flex items-center gap-3 min-w-0">
-            <BrandLogo glow className="w-7 h-7 md:hidden shrink-0" />
+            <BrandLogo className="w-7 h-7 md:hidden shrink-0" />
             <div className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
               <currentNav.icon className="w-4 h-4" aria-hidden="true" />
             </div>
@@ -625,7 +625,7 @@ export function AsisClientShell() {
         </header>
 
         {screen !== 'home' && (
-          <div className="flex items-center justify-center px-4 pb-1 pt-4 md:hidden">
+          <div className="flex items-center justify-start px-5 pb-0 pt-5 md:hidden">
             <h1 className="text-lg font-bold tracking-tight">{isFa ? currentNav.labelFa : currentNav.labelEn}</h1>
           </div>
         )}
@@ -645,6 +645,11 @@ export function AsisClientShell() {
                   hydratedSelectedServer ? probingIds.has(hydratedSelectedServer.id) : false
                 }
                 onProbeSelectedServer={(srv) => void handleProbeServers([srv])}
+                onProbeServers={(targets) => void handleProbeServers(targets)}
+                onSelectServer={(srv) => {
+                  setAutoConnectPending(false);
+                  setSelectedServer(srv);
+                }}
                 onNavigate={(target) => setScreen(target)}
               />
             )}
@@ -730,10 +735,10 @@ export function AsisClientShell() {
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation: floating glass pill */}
       <nav
         aria-label="Mobile Navigation"
-        className="asis-glass fixed bottom-0 inset-x-0 z-40 flex md:hidden items-stretch justify-around rounded-t-3xl border-t border-[var(--asis-primary-border)] bg-[var(--asis-chrome)]/95 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-12px_rgba(var(--asis-glow-rgb),0.45)] backdrop-blur-xl"
+        className="asis-tabbar fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-stretch justify-around rounded-[28px] px-1.5 py-1.5 md:hidden"
       >
         {mobileNav.map((item) => {
           const Icon = item.icon;
@@ -744,25 +749,20 @@ export function AsisClientShell() {
               type="button"
               aria-current={active ? 'page' : undefined}
               onClick={() => setScreen(item.id)}
-              className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[11px] font-medium transition-colors duration-150 cursor-pointer ${
-                active
-                  ? 'text-[var(--asis-accent-fg)] asis-neon-text'
-                  : 'text-[var(--asis-text-secondary)]'
+              className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1 text-[10.5px] font-medium transition-colors duration-150 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--asis-primary)] ${
+                active ? 'text-[var(--asis-accent-fg)]' : 'text-[var(--asis-text-secondary)]'
               }`}
             >
-              <Icon
-                className={`w-5 h-5 transition-transform duration-150 ${
-                  active ? 'scale-110 drop-shadow-[0_0_8px_rgba(var(--asis-glow-rgb),0.9)]' : ''
+              <span
+                className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${
+                  active
+                    ? 'asis-tab-indicator bg-[var(--asis-primary)] text-white shadow-[0_6px_18px_-4px_rgba(var(--asis-glow-rgb),0.8)]'
+                    : ''
                 }`}
-                aria-hidden="true"
-              />
+              >
+                <Icon className="w-[20px] h-[20px]" aria-hidden="true" />
+              </span>
               <span className="truncate max-w-[64px]">{isFa ? item.labelFa : item.labelEn}</span>
-              {active && (
-                <span
-                  aria-hidden="true"
-                  className="absolute -top-2 h-0.5 w-8 rounded-full bg-[var(--asis-primary)] shadow-[0_0_10px_rgba(var(--asis-glow-rgb),0.9)]"
-                />
-              )}
             </button>
           );
         })}

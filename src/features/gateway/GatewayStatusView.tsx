@@ -174,7 +174,7 @@ export function GatewayStatusView() {
               <Server className="w-5 h-5 text-[var(--asis-accent-fg)]" aria-hidden="true" />
               <h3 className="text-sm font-semibold">PasarGuard Adapter Registry</h3>
             </div>
-            <span className="font-mono text-xs text-[#D97706] dark:text-[#FBBF24]">
+            <span className="font-mono text-xs text-[#B7791F] dark:text-[#E0A030]">
               {health.adapters.pasarguard.status}
             </span>
           </div>
@@ -190,10 +190,10 @@ export function GatewayStatusView() {
         <Card className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-[#D97706] dark:text-[#FBBF24]" aria-hidden="true" />
+              <ShieldAlert className="w-5 h-5 text-[#B7791F] dark:text-[#E0A030]" aria-hidden="true" />
               <h3 className="text-sm font-semibold">Reseller Adapter</h3>
             </div>
-            <span className="font-mono text-xs text-[#D97706] dark:text-[#FBBF24]">
+            <span className="font-mono text-xs text-[#B7791F] dark:text-[#E0A030]">
               {health.adapters.reseller.status}
             </span>
           </div>

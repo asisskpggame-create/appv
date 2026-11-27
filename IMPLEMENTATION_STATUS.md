@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last Updated: 2026-11-27 (0.4.28)
+Last Updated: 2026-11-27 (0.4.30)
 
 | Phase | Scope | Status | Honest Runtime Notes |
 |---|---|---|---|
@@ -49,3 +49,6 @@ Last Updated: 2026-11-27 (0.4.28)
 - **Design pass (0.4.28):** Home pill wording, optional sign-up link (`VITE_SIGNUP_URL`), plan line and add-subscription link. Notifications / smart DNS / theme rows from the design image are not built (no function behind them).
 - **What is NOT verified (all of 0.4.20 - 0.4.27):** none of this Java has been compiled against the Android SDK or run on a device. The tests for it are source guards (they read the text of the file). The first CI build is the first real compile. Points to check there: the `systemExempted` service type on Android 14+, the `/proxies` reply shape from sing-box, and the notification permission dialog on Android 13+.
 - **Still open:** secure-storage plugin install, sales-bot side of `/verify-login` (profile, purchased services, recovery), PasarGuard admin API schema, iOS and Windows engines, `bun.lock`, 360-430 px visual check.
+
+- **Design pass 2 (0.4.30):** big total-usage card in Statistics, Power button restyled to the design image. Source-guard tests only; not type-checked, built or rendered here.
+- **0.4.31:** owner delegated the theme-row decision: dark-only, no theme row. Design rows still unbuilt on purpose: theme, notifications, smart DNS.

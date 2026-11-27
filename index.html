@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#030816" />
+    <meta name="theme-color" content="#0B0F15" />
     <title>ASiS VPN — Multi-Platform VPN Client</title>
     <meta name="description" content="ASiS VPN — Commercial multi-platform VPN client, gateway architecture, and bilingual RTL/LTR design system." />
     <meta property="og:title" content="ASiS VPN — Multi-Platform VPN Client" />
@@ -18,7 +18,7 @@
           var resolved = pref === 'dark' || (pref === 'system' && prefersDark) ? 'dark' : 'light';
           if (resolved === 'dark') document.documentElement.classList.add('dark');
           var palette = 'azure';
-          if (palette === 'azure' || palette === 'emerald' || palette === 'titanium') {
+          if (palette === 'azure' || palette === 'emerald' || palette === 'titanium' || palette === 'violet') {
             document.documentElement.setAttribute('data-palette', palette);
           }
           var loc = localStorage.getItem('asis_locale_pref_v1');
@@ -33,16 +33,13 @@
       #boot-splash {
         position: fixed; inset: 0; z-index: 9999;
         display: flex; align-items: center; justify-content: center;
-        background:
-          radial-gradient(ellipse 70% 45% at 50% 45%, rgba(29, 134, 255, 0.28), transparent 70%),
-          linear-gradient(180deg, #030816 0%, #061433 55%, #030816 100%);
+        background: #0B0F15;
         transition: opacity 0.35s ease, visibility 0.35s ease;
       }
-      html:not(.dark) #boot-splash { background: #F3F6FB; }
+      html:not(.dark) #boot-splash { background: #F4F6F9; }
       #boot-splash.hide { opacity: 0; visibility: hidden; }
       #boot-splash img {
-        width: 132px; height: 132px; border-radius: 50%;
-        filter: drop-shadow(0 0 18px rgba(29, 134, 255, 0.8));
+        width: 88px; height: 88px; border-radius: 50%;
         animation: boot-pulse 1.6s ease-in-out infinite;
       }
       @keyframes boot-pulse { 0%, 100% { transform: scale(0.97); } 50% { transform: scale(1.04); } }

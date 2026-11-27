@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { WorldMapDots } from './WorldMapDots';
 import {
   Activity,
   ArrowDown,
   ArrowUp,
   ChevronRight,
+  Crown,
   Globe,
   Layers,
   Radio,
@@ -14,6 +14,7 @@ import {
   Sliders,
   Stethoscope,
   Wifi,
+  Zap,
 } from 'lucide-react';
 import { ConnectionButton } from './ConnectionButton';
 import { BrandLogo } from '../../design-system/components';
@@ -57,8 +58,30 @@ interface HomeViewProps {
   onAutoConnectHandled?: () => void;
   probingSelectedServer?: boolean;
   onProbeSelectedServer?: (server: ServerCatalogEntry) => void;
+  /** Switch the selected server (used by the fastest-server card). */
+  onSelectServer?: (server: ServerCatalogEntry) => void;
+  /** Measure latency of several servers at once (used by the fastest-server card). */
+  onProbeServers?: (servers: ServerCatalogEntry[]) => void;
   onNavigate: (view: 'locations' | 'subscriptions' | 'support' | 'settings') => void;
 }
+
+/** Tiny live chart for a speed history (newest sample on the right). */
+function Sparkline({ values, className = '' }: { values: number[]; className?: string }) {
+  const w = 96;
+  const h = 28;
+  const max = Math.max(1, ...values);
+  const pts = values.length >= 2 ? values : [0, 0];
+  const step = w / (pts.length - 1);
+  const points = pts.map((v, i) => `${(i * step).toFixed(1)},${(h - 2 - (v / max) * (h - 6)).toFixed(1)}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className={className} preserveAspectRatio="none" aria-hidden="true">
+      <polygon points={`0,${h} ${points} ${w},${h}`} fill="currentColor" opacity="0.14" />
+      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const SPARK_POINTS = 24;
 
 function formatDuration(sec: number): string {
   const hrs = Math.floor(sec / 3600);
@@ -77,6 +100,8 @@ export function HomeView({
   onAutoConnectHandled,
   probingSelectedServer = false,
   onProbeSelectedServer,
+  onSelectServer,
+  onProbeServers,
   onNavigate,
 }: HomeViewProps) {
   const { locale, dir } = usePreferences();
@@ -92,6 +117,12 @@ export function HomeView({
   const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus | null>(null);
 
   const stats = engine.getConnectionStatistics();
+
+  // Rolling speed history for the two mini charts (one sample per second while connected).
+  const [downHistory, setDownHistory] = useState<number[]>([]);
+  const [upHistory, setUpHistory] = useState<number[]>([]);
+  const latestSpeeds = useRef({ down: 0, up: 0 });
+  latestSpeeds.current = { down: stats.downloadSpeedBps ?? 0, up: stats.uploadSpeedBps ?? 0 };
 
   // Always reads the address the internet currently sees. Stale answers (from before a
   // connect/disconnect) are dropped via the request counter.
@@ -124,6 +155,19 @@ export function HomeView({
     exitRequestId.current += 1;
     setExitInfo(null);
     setIpLoading(false);
+  }, [connState]);
+
+  useEffect(() => {
+    if (connState !== 'Connected') {
+      setDownHistory([]);
+      setUpHistory([]);
+      return;
+    }
+    const timer = setInterval(() => {
+      setDownHistory((prev) => [...prev.slice(-(SPARK_POINTS - 1)), latestSpeeds.current.down]);
+      setUpHistory((prev) => [...prev.slice(-(SPARK_POINTS - 1)), latestSpeeds.current.up]);
+    }, 1000);
+    return () => clearInterval(timer);
   }, [connState]);
 
   // The native tunnel can outlive the web view: on mount, show what it is really doing.
@@ -304,41 +348,87 @@ export function HomeView({
   };
 
   const isConnected = connState === 'Connected';
-
-  const totalBytes = stats.sessionDownloadBytes + stats.sessionUploadBytes;
+  const isBusy = connState === 'Preparing' || connState === 'Connecting' || connState === 'Reconnecting' || connState === 'Disconnecting';
   const cityLabel = (shownServer as { city?: string } | null)?.city;
 
-  return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-start">
-      {/* Brand + connection status over the glowing map */}
-      <section className="relative flex flex-col items-center overflow-hidden rounded-3xl px-4 pb-4 pt-5 text-center">
-        <div aria-hidden="true" className="asis-hero-map pointer-events-none absolute inset-0" />
-        <WorldMapDots
-          className="pointer-events-none absolute inset-0 h-full w-full opacity-40 [mask-image:radial-gradient(ellipse_90%_80%_at_50%_45%,#000_35%,transparent_85%)]"
-        />
-        <div className="relative z-10 flex flex-col items-center gap-2">
-          <BrandLogo glow className="h-28 w-28 shadow-[0_0_34px_2px_rgba(29,134,255,0.5)]" />
-          <p className="text-lg font-extrabold tracking-wide text-white [text-shadow:0_0_14px_rgba(59,152,255,0.85)]" dir="ltr">
-            ASiS VPN
-          </p>
+  const statusTone = isConnected
+    ? 'text-[#2BB673]'
+    : connState === 'Error'
+      ? 'text-[#D64545]'
+      : isBusy
+        ? 'text-[var(--asis-accent-fg)]'
+        : 'text-[var(--asis-text-secondary)]';
+  const dotTone = isConnected
+    ? 'bg-[#2BB673] asis-status-dot-live'
+    : connState === 'Error'
+      ? 'bg-[#D64545]'
+      : isBusy
+        ? 'bg-[var(--asis-primary)]'
+        : 'bg-[var(--asis-text-secondary)]/60';
 
-          <div
-            className={`mt-1 inline-flex items-center gap-2 rounded-full border px-5 py-1.5 text-sm font-bold ${
-              isConnected
-                ? 'border-[#22C55E]/60 bg-gradient-to-b from-[#16A34A]/70 to-[#15803D]/70 text-white shadow-[0_0_22px_-2px_rgba(34,197,94,0.75)]'
-                : connState === 'Error'
-                  ? 'border-[#DC2626]/50 bg-[#DC2626]/15 text-[#F87171]'
-                  : 'border-[var(--asis-border-strong)] bg-[var(--asis-surface-2)] text-[var(--asis-text-secondary)]'
-            }`}
-          >
-            {isConnected ? <Shield className="h-4 w-4" aria-hidden="true" /> : <ShieldAlert className="h-4 w-4" aria-hidden="true" />}
-            <span>{stateLabel(connState)}</span>
+  // Fastest server card: candidates come sorted best-first; only measured latency counts.
+  const bestServer = autoSwitchCandidates.find((c) => c.probeLatencyMs !== null) ?? null;
+  const untestedCandidates = autoSwitchCandidates
+    .filter((c) => c.probeLatencyMs === null && c.probeHost && c.port)
+    .slice(0, 12);
+  const probingAny = probingSelectedServer;
+  const showFastestCard =
+    !isConnected &&
+    !isBusy &&
+    Boolean(selectedServer) &&
+    ((bestServer !== null && bestServer.id !== selectedServer?.id) ||
+      (bestServer === null && untestedCandidates.length > 0 && Boolean(onProbeServers)));
+
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col gap-5 text-start">
+      {/* Top row: brand + status chip on one side, plan chip on the other */}
+      <header className="flex items-center justify-between gap-3 pt-1">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <BrandLogo className="h-9 w-9 shrink-0" glow />
+          <div className="min-w-0">
+            <span className="block text-base font-bold leading-tight tracking-tight" dir="ltr">
+              ASiS VPN
+            </span>
+            <span className={`flex items-center gap-1.5 text-[11px] font-medium leading-tight ${statusTone}`} aria-live="polite">
+              <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${dotTone}`} />
+              {stateLabel(connState)}
+            </span>
           </div>
-          <p className="font-mono text-2xl font-semibold tracking-wider text-white" dir="ltr">
-            {formatDuration(stats.sessionDurationSec)}
-          </p>
         </div>
+        <button
+          type="button"
+          onClick={() => onNavigate('subscriptions')}
+          className="asis-glass inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-full px-3.5 text-xs font-semibold text-[var(--asis-accent-fg)]"
+        >
+          <Crown className="h-4 w-4" aria-hidden="true" />
+          {isFa ? 'اشتراک' : 'Plan'}
+        </button>
+      </header>
+
+      {/* Timer */}
+      <section className="flex flex-col items-center gap-1 pt-1 text-center">
+        <p
+          className={`font-mono text-[48px] font-light leading-none tracking-tight transition-colors ${
+            isConnected ? 'asis-neon-text text-[var(--asis-text-primary)]' : 'text-[var(--asis-text-secondary)]/50'
+          }`}
+          dir="ltr"
+        >
+          {formatDuration(stats.sessionDurationSec)}
+        </p>
+        <p className="h-4 font-mono text-xs text-[var(--asis-text-secondary)]" dir="ltr">
+          {isConnected && exitInfo?.ip ? `${exitInfo.ip}${exitInfo.countryCode ? ` · ${exitInfo.countryCode}` : ''}` : ''}
+        </p>
       </section>
+
+      {/* Connect control */}
+      <div className="-my-2 flex flex-col items-center">
+        <ConnectionButton
+          connState={connState}
+          hasSelectedServer={Boolean(selectedServer)}
+          isFa={isFa}
+          onToggle={() => void handleToggleConnection()}
+        />
+      </div>
 
       {engineError && (
         <StatusBanner
@@ -367,45 +457,51 @@ export function HomeView({
         />
       )}
 
-      {/* Download / Upload */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card padding="sm" elevated className="space-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-[var(--asis-text-secondary)]">
-            <ArrowDown className="h-4 w-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            <span>{isFa ? 'دانلود' : 'Download'}</span>
+      {/* Fastest server shortcut */}
+      {showFastestCard && (
+        <div className="asis-glass flex items-center gap-3 rounded-3xl px-4 py-3.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--asis-primary)] text-white shadow-[0_6px_18px_-4px_rgba(var(--asis-glow-rgb),0.8)]">
+            <Zap className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold">
+              {bestServer ? (isFa ? 'سریع‌ترین سرور' : 'Fastest server') : isFa ? 'پیدا کردن سریع‌ترین سرور' : 'Find the fastest server'}
+            </p>
+            <p className="truncate text-xs text-[var(--asis-text-secondary)]">
+              {bestServer
+                ? `${bestServer.name} · ${bestServer.probeLatencyMs} ms`
+                : isFa
+                  ? 'پینگ سرورهای اشتراک را بسنج'
+                  : 'Measure the ping of your subscription servers'}
+            </p>
           </div>
-          <p className="font-mono text-lg font-bold" dir="ltr">
-            {formatBytesCompact(stats.sessionDownloadBytes, '0 B')}
-          </p>
-          <p className="font-mono text-[11px] text-[var(--asis-text-secondary)]" dir="ltr">
-            {stats.downloadSpeedBps !== null ? `${stats.downloadSpeedBps} B/s` : '--'}
-          </p>
-        </Card>
-        <Card padding="sm" elevated className="space-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-[var(--asis-text-secondary)]">
-            <ArrowUp className="h-4 w-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            <span>{isFa ? 'آپلود' : 'Upload'}</span>
-          </div>
-          <p className="font-mono text-lg font-bold" dir="ltr">
-            {formatBytesCompact(stats.sessionUploadBytes, '0 B')}
-          </p>
-          <p className="font-mono text-[11px] text-[var(--asis-text-secondary)]" dir="ltr">
-            {stats.uploadSpeedBps !== null ? `${stats.uploadSpeedBps} B/s` : '--'}
-          </p>
-        </Card>
-      </div>
+          <button
+            type="button"
+            disabled={probingAny}
+            onClick={() => {
+              if (bestServer) onSelectServer?.(bestServer);
+              else onProbeServers?.(untestedCandidates);
+            }}
+            className="inline-flex h-9 shrink-0 cursor-pointer items-center rounded-full bg-[var(--asis-primary-soft)] px-4 text-xs font-semibold text-[var(--asis-accent-fg)] disabled:opacity-50"
+          >
+            {bestServer ? (isFa ? 'استفاده' : 'Use') : isFa ? 'تست' : 'Test'}
+          </button>
+        </div>
+      )}
 
       {/* Selected server */}
       <button
         type="button"
         onClick={() => onNavigate('locations')}
-        className="asis-glass flex w-full items-center gap-3 rounded-2xl border border-[var(--asis-primary-border)]/70 bg-[var(--asis-surface)] px-4 py-3.5 text-start cursor-pointer"
+        className={`asis-glass flex w-full cursor-pointer items-center gap-3.5 rounded-3xl px-4 py-3.5 text-start transition-colors ${
+          isConnected ? 'asis-glass-active' : ''
+        }`}
       >
         {selectedServer ? (
           <>
             <CountryFlag code={selectedServer.countryCode} emoji={selectedServer.countryFlag} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold">{selectedServer.name}</p>
+              <p className="truncate text-[15px] font-semibold">{selectedServer.name}</p>
               <p className="truncate text-xs text-[var(--asis-text-secondary)]">
                 {cityLabel ?? selectedServer.protocol}
                 {selectedServer.route === 'tunnel' ? (isFa ? ' · تانل' : ' · Tunnel') : ''}
@@ -422,10 +518,15 @@ export function HomeView({
           </>
         ) : (
           <>
-            <Globe className="h-6 w-6 shrink-0 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            <p className="flex-1 text-sm font-semibold">
-              {isFa ? 'انتخاب سرور از فهرست' : 'Choose a server'}
-            </p>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--asis-surface-2)] text-[var(--asis-text-secondary)]">
+              <Globe className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold">{isFa ? 'سروری انتخاب نشده' : 'No server selected'}</p>
+              <p className="text-xs text-[var(--asis-text-secondary)]">
+                {isFa ? 'برای شروع یک سرور انتخاب کنید' : 'Pick a server to get started'}
+              </p>
+            </div>
           </>
         )}
         <ChevronRight
@@ -434,22 +535,45 @@ export function HomeView({
         />
       </button>
 
-      {/* Power button */}
-      <div className="flex flex-col items-center py-3">
-        <ConnectionButton
-          connState={connState}
-          hasSelectedServer={Boolean(selectedServer)}
-          isFa={isFa}
-          onToggle={() => void handleToggleConnection()}
-        />
-      </div>
-
-      {isConnected && exitInfo?.ip && (
-        <p className="text-center font-mono text-xs text-[var(--asis-text-secondary)]" dir="ltr">
-          IP {exitInfo.ip}
-          {exitInfo.countryCode ? ` · ${exitInfo.countryCode}` : ''}
-        </p>
-      )}
+      {/* Session traffic: two glass chips with live mini charts */}
+      <section aria-label={isFa ? 'مصرف این نشست' : 'This session'} className="grid grid-cols-2 gap-3">
+        {[
+          {
+            key: 'down',
+            icon: ArrowDown,
+            label: isFa ? 'دانلود' : 'Download',
+            bytes: stats.sessionDownloadBytes,
+            speed: stats.downloadSpeedBps,
+            history: downHistory,
+            tone: 'text-[#2BB673]',
+          },
+          {
+            key: 'up',
+            icon: ArrowUp,
+            label: isFa ? 'آپلود' : 'Upload',
+            bytes: stats.sessionUploadBytes,
+            speed: stats.uploadSpeedBps,
+            history: upHistory,
+            tone: 'text-[var(--asis-accent-fg)]',
+          },
+        ].map(({ key, icon: Icon, label, bytes, speed, history, tone }) => (
+          <div key={key} className="asis-glass overflow-hidden rounded-3xl px-4 py-3.5">
+            <div className="flex items-center gap-2 text-xs text-[var(--asis-text-secondary)]">
+              <span className={`flex h-6 w-6 items-center justify-center rounded-full bg-[var(--asis-surface-2)] ${tone}`}>
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+              </span>
+              <span>{label}</span>
+            </div>
+            <p className="mt-2 font-mono text-lg font-semibold" dir="ltr">
+              {formatBytesCompact(bytes, '0 B')}
+            </p>
+            <p className="font-mono text-[11px] text-[var(--asis-text-secondary)]" dir="ltr">
+              {speed !== null ? `${speed} B/s` : '--'}
+            </p>
+            <Sparkline values={history} className={`mt-2 h-7 w-full ${tone}`} />
+          </div>
+        ))}
+      </section>
     </div>
   );
 }

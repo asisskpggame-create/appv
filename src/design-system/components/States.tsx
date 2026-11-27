@@ -215,7 +215,7 @@ export function ErrorState({ title, description, actionLabel, onAction }: StateB
       role="alert"
       className="flex flex-col items-center justify-center rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-6 py-10 text-center dark:border-[#7F1D1D] dark:bg-[#3A0C12]/40"
     >
-      <AlertCircle className="w-8 h-8 text-[#DC2626] dark:text-[#F87171]" aria-hidden="true" />
+      <AlertCircle className="w-8 h-8 text-[#D64545] dark:text-[#F07070]" aria-hidden="true" />
       <h4 className="mt-3 text-sm font-semibold text-[var(--asis-text-primary)]">{title}</h4>
       <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--asis-text-secondary)]">
         {description}

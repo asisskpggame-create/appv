@@ -58,6 +58,19 @@ function getBarcodeDetectorCtor(): (new (opts?: { formats?: string[] }) => Brows
   return typeof w.BarcodeDetector === 'function' ? w.BarcodeDetector : null;
 }
 
+/** Days left and total days of a plan, or null when the dates are missing or invalid. */
+function planDays(sub: { startsAt: string | null; expiresAt: string | null }): { left: number; total: number } | null {
+  if (!sub.startsAt || !sub.expiresAt) return null;
+  const start = Date.parse(sub.startsAt);
+  const end = Date.parse(sub.expiresAt);
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+  const day = 86_400_000;
+  return {
+    left: Math.max(0, Math.ceil((end - Date.now()) / day)),
+    total: Math.max(1, Math.round((end - start) / day)),
+  };
+}
+
 export function SubscriptionsView({
   session = null,
   activeSubscriptionId = null,
@@ -350,6 +363,7 @@ export function SubscriptionsView({
           <p className="mt-1 text-sm text-[var(--asis-text-secondary)]">{t.subtitle}</p>
         </div>
 
+        {(accountSubscriptions.length > 0 || tab === 'account') && (
         <SegmentedControl<SubscriptionTab>
           ariaLabel={t.title}
           value={tab}
@@ -359,6 +373,7 @@ export function SubscriptionsView({
             { value: 'account', label: `${t.tabAccount} (${accountSubscriptions.length})` },
           ]}
         />
+        )}
       </div>
 
       {/* Method A: Account Subscriptions */}
@@ -584,12 +599,7 @@ export function SubscriptionsView({
                   (sub.expiresAt !== null && Date.parse(sub.expiresAt) <= Date.now());
 
                 return (
-                  <Card
-                    key={sub.id}
-                    className={`space-y-4 ${
-                      isSelected ? 'ring-2 ring-[var(--asis-primary)]' : ''
-                    }`}
-                  >
+                  <Card key={sub.id} elevated={isSelected} className="space-y-4">
                     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--asis-border)] pb-4">
                       <div>
                         <div className="flex items-center gap-2">
@@ -599,7 +609,10 @@ export function SubscriptionsView({
                           </span>
                         </div>
                         {planSummary(sub) && (
-                          <p dir="ltr" className="mt-1 text-sm font-medium text-start">
+                          <p
+                            dir="ltr"
+                            className="mt-2 inline-flex rounded-full bg-[var(--asis-primary-soft)] px-3 py-1 text-sm font-semibold text-[var(--asis-accent-fg)]"
+                          >
                             {planSummary(sub)}
                           </p>
                         )}
@@ -631,13 +644,13 @@ export function SubscriptionsView({
                           aria-label={t.btnDelete}
                           onClick={() => setDeleteTarget(sub)}
                         >
-                          <Trash2 className="w-4 h-4 text-[#DC2626] dark:text-[#F87171]" />
+                          <Trash2 className="w-4 h-4 text-[#D64545] dark:text-[#F07070]" />
                         </Button>
                       </div>
                     </div>
 
                     {sub.totalBytes !== null && sub.totalBytes > 0 && sub.usedBytes !== null && (
-                      <div className="flex flex-col items-center gap-4 rounded-2xl border border-[var(--asis-primary-border)] bg-[var(--asis-primary-soft)]/40 p-5 sm:flex-row sm:justify-around">
+                      <div className="flex flex-col items-center gap-5 rounded-3xl border border-[var(--asis-primary-border)] bg-[var(--asis-primary-soft)]/40 p-5 sm:flex-row sm:justify-around">
                         <QuotaRing
                           percent={Math.round((sub.usedBytes / sub.totalBytes) * 100)}
                           caption={locale === 'fa-IR' ? 'مصرف شده' : 'used'}
@@ -661,13 +674,42 @@ export function SubscriptionsView({
                                 : t.unavailable}
                             </span>
                           </p>
+                          {(() => {
+                            const days = planDays(sub);
+                            if (!days) return null;
+                            const pct = Math.max(0, Math.min(100, Math.round((days.left / days.total) * 100)));
+                            return (
+                              <div className="space-y-1.5 pt-1">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-[var(--asis-text-secondary)]">
+                                    {locale === 'fa-IR' ? 'زمان باقی‌مانده' : 'Time left'}
+                                  </span>
+                                  <span className="font-mono font-semibold">
+                                    {locale === 'fa-IR' ? `${days.left} از ${days.total} روز` : `${days.left} of ${days.total} days`}
+                                  </span>
+                                </div>
+                                <div
+                                  className="h-2 overflow-hidden rounded-full bg-[var(--asis-border)]/70"
+                                  role="progressbar"
+                                  aria-valuemin={0}
+                                  aria-valuemax={days.total}
+                                  aria-valuenow={days.left}
+                                >
+                                  <div
+                                    className="h-full rounded-full bg-gradient-to-r from-[var(--asis-primary-hover)] to-[var(--asis-primary)]"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })()}
                           {sub.renewalAvailable &&
                             typeof sub.renewalUrl === 'string' &&
                             sub.renewalUrl.startsWith('https://') && (
                               <Button
                                 variant="primary"
-                                size="md"
-                                className="w-full"
+                                size="lg"
+                                className="w-full !rounded-full"
                                 onClick={() =>
                                   window.open(sub.renewalUrl as string, '_blank', 'noopener,noreferrer')
                                 }

@@ -27,21 +27,21 @@ export function ToggleSwitch({
       onClick={() => onChange(!checked)}
       dir="ltr"
       className={`relative inline-flex shrink-0 items-center rounded-full border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--asis-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--asis-surface)] ${
-        isSmall ? 'h-5 w-9' : 'h-6 w-11'
+        isSmall ? 'h-5 w-9' : 'h-[26px] w-[46px]'
       } ${
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
       } ${
         checked
-          ? 'border-[var(--asis-primary)] bg-[var(--asis-primary)] dark:shadow-[0_0_12px_rgba(var(--asis-glow-rgb),0.7)]'
-          : 'border-[var(--asis-border-strong)] bg-[var(--asis-surface-2)]'
+          ? 'border-transparent bg-[var(--asis-primary)]'
+          : 'border-transparent bg-[var(--asis-border-strong)]'
       }`}
     >
       <span
         aria-hidden="true"
-        className={`pointer-events-none inline-block rounded-full bg-white shadow-xs transition-transform duration-150 ${
+        className={`pointer-events-none inline-block rounded-full bg-white shadow-sm transition-transform duration-200 ${
           isSmall
             ? `h-3.5 w-3.5 ${checked ? 'translate-x-4.5' : 'translate-x-0.5'}`
-            : `h-4 w-4 ${checked ? 'translate-x-5.5' : 'translate-x-1'}`
+            : `h-5 w-5 ${checked ? 'translate-x-[22px]' : 'translate-x-[2px]'}`
         }`}
       />
     </button>

@@ -7,6 +7,7 @@ import {
   MapPin,
   Plus,
   RefreshCw,
+  Search,
   ShieldAlert,
   Star,
   Trash2,
@@ -172,6 +173,17 @@ export function ServersView({
     }
     return filtered;
   }, [allServers, countryFilter, favoriteIds, favoritesOnly, protocolFilter, searchQuery, sortMode]);
+
+  const quickFilter: 'all' | 'fast' | 'favorites' = favoritesOnly ? 'favorites' : sortMode === 'latency' ? 'fast' : 'all';
+  const handleQuickFilter = (id: 'all' | 'fast' | 'favorites') => {
+    setFavoritesOnly(id === 'favorites');
+    setSortMode(id === 'fast' ? 'latency' : 'default');
+    // "Fast" needs measured latency: test the servers that have none yet.
+    if (id === 'fast' && onProbeServers && probingIds.size === 0) {
+      const untested = allServers.filter((x) => x.supported && x.probeHost && x.port && x.probeLatencyMs === null);
+      if (untested.length > 0) onProbeServers(untested);
+    }
+  };
 
   const recentServers = useMemo(
     () =>
@@ -512,19 +524,49 @@ export function ServersView({
         />
       ) : (
         <div className="space-y-4">
-          <div className="md:hidden">
-            <SegmentedControl<'all' | 'favorites'>
-              ariaLabel={isFa ? 'فیلتر سرورها' : 'Server filter'}
-              value={favoritesOnly ? 'favorites' : 'all'}
-              onChange={(v) => setFavoritesOnly(v === 'favorites')}
-              options={[
-                { value: 'all', label: isFa ? 'همه کشورها' : 'All countries' },
-                { value: 'favorites', label: isFa ? 'علاقه‌مندی‌ها' : 'Favorites' },
-              ]}
-            />
+          {/* Phone: glass search pill + quick filter chips */}
+          <div className="space-y-3 md:hidden">
+            <label className="asis-glass flex h-12 items-center gap-2.5 rounded-full px-4 text-[var(--asis-text-secondary)] asis-search">
+              <Search className="h-4.5 w-4.5 shrink-0" aria-hidden="true" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                aria-label={t.searchPlaceholder}
+                className="min-w-0 flex-1 bg-transparent text-sm text-[var(--asis-text-primary)] placeholder:text-[var(--asis-text-secondary)] focus:outline-none"
+              />
+            </label>
+            <div role="group" aria-label={isFa ? 'فیلتر سرورها' : 'Server filter'} className="flex gap-2 overflow-x-auto pb-0.5">
+              {(
+                [
+                  { id: 'all', label: isFa ? 'همه' : 'All', icon: Globe },
+                  { id: 'fast', label: isFa ? 'سریع' : 'Fast', icon: Zap },
+                  { id: 'favorites', label: isFa ? 'علاقه‌مندی‌ها' : 'Favorites', icon: Star },
+                ] as const
+              ).map(({ id, label, icon: Icon }) => {
+                const active = quickFilter === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => handleQuickFilter(id)}
+                    className={`inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors ${
+                      active
+                        ? 'bg-[var(--asis-primary)] text-white shadow-[0_6px_18px_-6px_rgba(var(--asis-glow-rgb),0.8)]'
+                        : 'asis-glass text-[var(--asis-text-secondary)]'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <Card className="grid grid-cols-1 gap-4 !p-3 md:!p-6 md:grid-cols-12 items-end">
+          <Card className="hidden gap-4 !p-3 md:!p-6 md:grid md:grid-cols-12 items-end">
             <div className="md:col-span-4">
               <Input
                 label={t.colServer}
@@ -614,10 +656,10 @@ export function ServersView({
                 return (
                   <li key={srv.id}>
                     <div
-                      className={`asis-glass flex items-center gap-3 rounded-2xl border px-3.5 py-3 transition-all duration-150 ${
+                      className={`asis-glass flex items-center gap-3 rounded-3xl px-3.5 py-3 transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.985] ${
                         isPending
-                          ? 'border-[var(--asis-primary)] shadow-[0_0_20px_-4px_rgba(var(--asis-glow-rgb),0.7)]'
-                          : 'border-[var(--asis-border)]'
+                          ? 'asis-glass-active'
+                          : 'hover:border-[var(--asis-border-strong)] hover:brightness-110'
                       } ${srv.supported ? '' : 'opacity-60'}`}
                     >
                       <button
@@ -649,7 +691,7 @@ export function ServersView({
                         aria-pressed={isFavorite}
                         onClick={() => handleToggleFavorite(srv.id)}
                         className={`shrink-0 p-1.5 cursor-pointer transition-transform duration-150 active:scale-90 ${
-                          isFavorite ? 'text-[#FBBF24]' : 'text-[var(--asis-border-strong)]'
+                          isFavorite ? 'text-[#E0A030]' : 'text-[var(--asis-border-strong)]'
                         }`}
                       >
                         <Star className="w-5 h-5" fill={isFavorite ? 'currentColor' : 'none'} />
@@ -665,7 +707,7 @@ export function ServersView({
               <Button
                 variant="primary"
                 size="lg"
-                className="w-full !min-h-[54px] !rounded-2xl !text-base !font-bold shadow-[0_10px_30px_-8px_rgba(29,134,255,0.8)]"
+                className="w-full !min-h-[52px] !rounded-full shadow-[0_12px_30px_-8px_rgba(var(--asis-glow-rgb),0.75)]"
                 disabled={!pendingServerId || !filteredServers.some((s) => s.id === pendingServerId && s.supported)}
                 onClick={() => {
                   const target = allServers.find((s) => s.id === pendingServerId);
@@ -709,7 +751,7 @@ export function ServersView({
                               onClick={() => handleToggleFavorite(srv.id)}
                               className={`cursor-pointer transition-transform duration-150 hover:scale-115 active:scale-90 ${
                                 isFavorite
-                                  ? 'text-[#D97706] dark:text-[#FBBF24]'
+                                  ? 'text-[#B7791F] dark:text-[#E0A030]'
                                   : 'text-[var(--asis-border-strong)] hover:text-[var(--asis-text-secondary)]'
                               }`}
                             >
@@ -754,7 +796,7 @@ export function ServersView({
                             className={`inline-flex items-center gap-1.5 ${
                               srv.supported
                                 ? 'text-[var(--asis-text-primary)]'
-                                : 'text-[#DC2626] dark:text-[#F87171]'
+                                : 'text-[#D64545] dark:text-[#F07070]'
                             }`}
                           >
                             {srv.supported ? (
@@ -804,7 +846,7 @@ export function ServersView({
                                 aria-label={t.removeCustomLabel}
                                 onClick={() => onRemoveCustomServer(srv.id)}
                               >
-                                <Trash2 className="w-3.5 h-3.5 text-[#DC2626] dark:text-[#F87171]" />
+                                <Trash2 className="w-3.5 h-3.5 text-[#D64545] dark:text-[#F07070]" />
                               </Button>
                             )}
                             <Button

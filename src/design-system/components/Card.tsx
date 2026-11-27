@@ -24,13 +24,11 @@ export function Card({
 }: CardProps) {
   return (
     <div
-      className={`asis-glass rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)] text-[var(--asis-text-primary)] dark:border-[var(--asis-primary-border)]/70 ${
-        elevated
-          ? 'shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_1px_2px_rgba(11,17,32,0.04),0_20px_44px_-22px_rgba(var(--asis-glow-rgb),0.22)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_26px_-8px_rgba(var(--asis-glow-rgb),0.4)]'
-          : 'shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(11,17,32,0.03)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.035),0_2px_10px_rgba(0,0,0,0.38)]'
+      className={`asis-glass rounded-3xl text-[var(--asis-text-primary)] ${
+        elevated ? 'asis-glass-active' : ''
       } ${
         interactive
-          ? 'group transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 hover:border-[var(--asis-border-strong)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_12px_26px_-14px_rgba(var(--asis-glow-rgb),0.26)] dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_14px_30px_-14px_rgba(0,0,0,0.8)]'
+          ? 'transition-all duration-150 hover:brightness-110'
           : ''
       } ${paddingClasses[padding]} ${className}`}
     >

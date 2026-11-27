@@ -4,25 +4,25 @@
 @layer base {
   :root {
     color-scheme: light;
-    --asis-bg: #F3F6FB;
-    --asis-chrome: #FAFBFD;
+    --asis-bg: #F4F6F9;
+    --asis-chrome: #FFFFFF;
     --asis-surface: #FFFFFF;
-    --asis-surface-2: #EDF2FA;
-    --asis-border: #DCE5F2;
-    --asis-border-strong: #C1D0E6;
-    --asis-text-primary: #0B1120;
-    --asis-text-secondary: #52627A;
-    --asis-primary: #087BFF;
-    --asis-primary-hover: #1684FF;
-    --asis-primary-active: #0667D6;
-    --asis-primary-soft: #EAF3FF;
-    --asis-primary-border: #C5DCFF;
-    --asis-accent-fg: #0564D4;
-    --asis-glow-rgb: 8, 123, 255;
-    --asis-skeleton-a: #E6EEF9;
-    --asis-skeleton-b: #F4F8FF;
-    --asis-chart-primary: #087BFF;
-    --asis-chart-secondary: #10B981;
+    --asis-surface-2: #EEF1F5;
+    --asis-border: #E2E7EE;
+    --asis-border-strong: #CBD3DE;
+    --asis-text-primary: #0F1722;
+    --asis-text-secondary: #5B6778;
+    --asis-primary: #2F6FEB;
+    --asis-primary-hover: #4580F0;
+    --asis-primary-active: #2560D0;
+    --asis-primary-soft: #EBF1FE;
+    --asis-primary-border: #C9D8FA;
+    --asis-accent-fg: #1F5BD1;
+    --asis-glow-rgb: 47, 111, 235;
+    --asis-skeleton-a: #E8ECF2;
+    --asis-skeleton-b: #F4F6F9;
+    --asis-chart-primary: #2F6FEB;
+    --asis-chart-secondary: #22A06B;
     --asis-font-latin: 'Vazirmatn', 'Noto Sans Arabic', Roboto, system-ui, -apple-system, sans-serif;
     --asis-font-persian: 'Vazirmatn', 'Noto Sans Arabic', Roboto, system-ui, sans-serif;
     --asis-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
@@ -30,25 +30,25 @@
 
   .dark {
     color-scheme: dark;
-    --asis-bg: #030816;
-    --asis-chrome: #050E24;
-    --asis-surface: #0A1630;
-    --asis-surface-2: #0F2147;
-    --asis-border: #153062;
-    --asis-border-strong: #23509C;
-    --asis-text-primary: #F3F8FF;
-    --asis-text-secondary: #9DB6DC;
-    --asis-primary: #1D86FF;
-    --asis-primary-hover: #3B98FF;
-    --asis-primary-active: #0F6FE0;
-    --asis-primary-soft: #0D2349;
-    --asis-primary-border: #1F4C9C;
-    --asis-accent-fg: #5FB0FF;
-    --asis-glow-rgb: 29, 134, 255;
-    --asis-skeleton-a: #0F2147;
-    --asis-skeleton-b: #1A3470;
-    --asis-chart-primary: #3898FF;
-    --asis-chart-secondary: #34D399;
+    --asis-bg: #0B0F15;
+    --asis-chrome: #0F141C;
+    --asis-surface: #141B24;
+    --asis-surface-2: #1B2430;
+    --asis-border: #232D3A;
+    --asis-border-strong: #344154;
+    --asis-text-primary: #EEF2F7;
+    --asis-text-secondary: #8D9AAE;
+    --asis-primary: #2F6FEB;
+    --asis-primary-hover: #4580F0;
+    --asis-primary-active: #2560D0;
+    --asis-primary-soft: #14223D;
+    --asis-primary-border: #25427C;
+    --asis-accent-fg: #7AA7FF;
+    --asis-glow-rgb: 47, 111, 235;
+    --asis-skeleton-a: #18212C;
+    --asis-skeleton-b: #222E3C;
+    --asis-chart-primary: #5B8FF5;
+    --asis-chart-secondary: #3BC48A;
   }
 
   /* Stealth Emerald Palette */
@@ -136,6 +136,51 @@
     --asis-chart-secondary: #34D399;
   }
 
+  /* Violet Palette */
+  html[data-palette="violet"] {
+    --asis-bg: #F6F4FB;
+    --asis-chrome: #FFFFFF;
+    --asis-surface: #FFFFFF;
+    --asis-surface-2: #EFEBF8;
+    --asis-border: #E4DEF2;
+    --asis-border-strong: #CFC5E6;
+    --asis-text-primary: #150F24;
+    --asis-text-secondary: #62597A;
+    --asis-primary: #7C3AED;
+    --asis-primary-hover: #8B5CF6;
+    --asis-primary-active: #6D28D9;
+    --asis-primary-soft: #F1EAFE;
+    --asis-primary-border: #D9C8FB;
+    --asis-accent-fg: #6D28D9;
+    --asis-glow-rgb: 124, 58, 237;
+    --asis-skeleton-a: #ECE7F6;
+    --asis-skeleton-b: #F7F4FC;
+    --asis-chart-primary: #7C3AED;
+    --asis-chart-secondary: #EC4899;
+  }
+
+  html.dark[data-palette="violet"] {
+    --asis-bg: #0A0713;
+    --asis-chrome: #0F0B1B;
+    --asis-surface: #171028;
+    --asis-surface-2: #20173A;
+    --asis-border: #2C2146;
+    --asis-border-strong: #40326A;
+    --asis-text-primary: #F3F0FA;
+    --asis-text-secondary: #A59BC0;
+    --asis-primary: #8B5CF6;
+    --asis-primary-hover: #A78BFA;
+    --asis-primary-active: #7C3AED;
+    --asis-primary-soft: #231747;
+    --asis-primary-border: #4C348E;
+    --asis-accent-fg: #B79CFF;
+    --asis-glow-rgb: 139, 92, 246;
+    --asis-skeleton-a: #1C1432;
+    --asis-skeleton-b: #291D49;
+    --asis-chart-primary: #A78BFA;
+    --asis-chart-secondary: #F472B6;
+  }
+
   html {
     font-family: var(--asis-font-latin);
     -webkit-font-smoothing: antialiased;
@@ -166,71 +211,131 @@
   }
 }
 
+/* Aurora canvas: deep base + two soft palette-colored glows (follows the active palette). */
 .asis-canvas-ambient {
+  background-color: var(--asis-bg);
   background-image:
-    radial-gradient(
-      ellipse 78% 44% at 50% 0%,
-      rgba(var(--asis-glow-rgb), 0.085),
-      transparent 70%
-    ),
-    radial-gradient(
-      rgba(var(--asis-glow-rgb), 0.11) 1px,
-      transparent 1px
-    );
-  background-size: 100% 100%, 24px 24px;
+    radial-gradient(60% 38% at 50% -6%, rgba(var(--asis-glow-rgb), 0.22), transparent 70%),
+    radial-gradient(50% 30% at 100% 62%, rgba(var(--asis-glow-rgb), 0.10), transparent 70%);
+  background-repeat: no-repeat;
 }
 
-.dark .asis-canvas-ambient {
+html:not(.dark) .asis-canvas-ambient {
   background-image:
-    radial-gradient(
-      ellipse 80% 46% at 50% 0%,
-      rgba(var(--asis-glow-rgb), 0.22),
-      transparent 72%
-    ),
-    radial-gradient(
-      ellipse 90% 40% at 50% 100%,
-      rgba(var(--asis-glow-rgb), 0.16),
-      transparent 75%
-    ),
-    radial-gradient(
-      rgba(120, 170, 255, 0.09) 1px,
-      transparent 1px
-    ),
-    linear-gradient(180deg, #030816 0%, #061433 55%, #030816 100%);
-  background-size: 100% 100%, 100% 100%, 24px 24px, 100% 100%;
+    radial-gradient(60% 36% at 50% -6%, rgba(var(--asis-glow-rgb), 0.12), transparent 70%);
 }
 
-/* Glass surface + neon edge utilities (dark theme look) */
+/* Frosted glass surface (cards, chips, bars). */
+.asis-glass {
+  background-color: color-mix(in srgb, var(--asis-surface) 62%, transparent);
+  border: 1px solid color-mix(in srgb, var(--asis-border-strong) 55%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 .dark .asis-glass {
-  background: linear-gradient(180deg, rgba(14, 32, 72, 0.72), rgba(7, 18, 44, 0.78));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 55%);
+}
+
+/* Selected / active glass: palette-colored edge and soft glow. */
+.asis-glass-active {
+  border-color: rgba(var(--asis-glow-rgb), 0.55);
+  box-shadow: 0 0 0 1px rgba(var(--asis-glow-rgb), 0.18), 0 10px 34px -12px rgba(var(--asis-glow-rgb), 0.5);
+}
+
+.asis-search:focus-within {
+  border-color: rgba(var(--asis-glow-rgb), 0.6);
+  box-shadow: 0 0 0 3px rgba(var(--asis-glow-rgb), 0.16);
 }
 
 .dark .asis-neon-edge {
   border-color: rgba(var(--asis-glow-rgb), 0.45);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 0 22px -6px rgba(var(--asis-glow-rgb), 0.45);
+  box-shadow: 0 0 22px -8px rgba(var(--asis-glow-rgb), 0.55);
 }
 
 .asis-neon-text {
-  text-shadow: 0 0 14px rgba(var(--asis-glow-rgb), 0.65);
+  text-shadow: 0 0 18px rgba(var(--asis-glow-rgb), 0.55);
 }
 
 .asis-logo-glow {
-  filter: drop-shadow(0 0 8px rgba(var(--asis-glow-rgb), 0.7));
+  filter: drop-shadow(0 0 10px rgba(var(--asis-glow-rgb), 0.45));
 }
 
-/* Home hero: dotted globe glow (placeholder for a real world-map asset) */
 .asis-hero-map {
-  background-image:
-    radial-gradient(circle at 50% 38%, rgba(var(--asis-glow-rgb), 0.22), transparent 62%),
-    radial-gradient(rgba(var(--asis-glow-rgb), 0.35) 1.2px, transparent 1.4px);
-  background-size: 100% 100%, 14px 14px;
-  -webkit-mask-image: radial-gradient(ellipse 85% 70% at 50% 40%, #000 30%, transparent 78%);
-  mask-image: radial-gradient(ellipse 85% 70% at 50% 40%, #000 30%, transparent 78%);
-  opacity: 0.55;
+  display: none;
+}
+
+/* Power orb: the glow color changes with state through --orb-rgb. */
+.asis-orb {
+  --orb-rgb: var(--asis-glow-rgb);
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.34), transparent 42%),
+    radial-gradient(circle at 50% 60%, rgba(var(--orb-rgb), 0.95), rgba(var(--orb-rgb), 0.55) 70%, rgba(var(--orb-rgb), 0.35));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+    0 -10px 24px rgba(0, 0, 0, 0.28) inset,
+    0 18px 50px -10px rgba(var(--orb-rgb), 0.75);
+  transition: box-shadow 400ms ease, background 400ms ease;
+}
+
+.asis-orb[data-state="idle"] {
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.16), transparent 45%),
+    linear-gradient(160deg, var(--asis-surface-2), var(--asis-surface));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--asis-border-strong) 70%, transparent) inset,
+    0 18px 40px -16px rgba(var(--asis-glow-rgb), 0.45);
+}
+
+.asis-orb[data-state="connected"] {
+  --orb-rgb: 43, 182, 115;
+}
+
+.asis-orb[data-state="error"] {
+  --orb-rgb: 214, 69, 69;
+}
+
+/* Soft halo rings that breathe behind the orb while connected. */
+@keyframes asis-halo {
+  0% { transform: scale(0.82); opacity: 0.55; }
+  100% { transform: scale(1.12); opacity: 0; }
+}
+.asis-halo {
+  position: absolute;
+  inset: 14%;
+  border-radius: 9999px;
+  border: 1px solid rgba(var(--orb-rgb, var(--asis-glow-rgb)), 0.6);
+  animation: asis-halo 2.8s ease-out infinite;
+}
+.asis-halo-delay {
+  animation-delay: 1.4s;
+}
+
+/* Dotted ring (particle look) around the orb. */
+.asis-dot-ring {
+  background-image: radial-gradient(rgba(var(--orb-rgb, var(--asis-glow-rgb)), 0.9) 1.2px, transparent 1.6px);
+  background-size: 9px 9px;
+  -webkit-mask-image: radial-gradient(circle, transparent 56%, #000 57%, #000 69%, transparent 70%);
+  mask-image: radial-gradient(circle, transparent 56%, #000 57%, #000 69%, transparent 70%);
+}
+
+/* Floating pill tab bar (phones). */
+.asis-tabbar {
+  background-color: color-mix(in srgb, var(--asis-chrome) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--asis-border-strong) 60%, transparent);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  box-shadow: 0 14px 40px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Status dot used on the home screen and in lists. */
+@keyframes asis-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(43, 182, 115, 0.45); }
+  100% { box-shadow: 0 0 0 8px rgba(43, 182, 115, 0); }
+}
+.asis-status-dot-live {
+  animation: asis-pulse-ring 1.8s ease-out infinite;
 }
 
 @keyframes asis-shimmer {
@@ -303,6 +408,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .asis-halo { animation: none; opacity: 0.25; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -370,5 +476,23 @@
 
   *::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* Touch devices have no hover: give every enabled button a small press response. */
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+  button:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}
+
+/* Bottom tab: the active bar grows in when a tab is selected. */
+@keyframes asis-tab-in {
+  from { opacity: 0; transform: scaleX(0.3); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .asis-tab-indicator {
+    animation: asis-tab-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 }

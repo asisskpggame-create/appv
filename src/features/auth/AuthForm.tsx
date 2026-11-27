@@ -271,12 +271,10 @@ export function AuthForm({
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-      {/* Hero: glowing brand mark */}
-      <div className="flex flex-col items-center gap-3 pt-2 text-center">
-        <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-[var(--asis-primary-border)] bg-[var(--asis-primary-soft)]/60 shadow-[0_0_40px_-4px_rgba(var(--asis-glow-rgb),0.6)]">
-          <BrandLogo glow className="h-16 w-16" />
-        </div>
-        <p className="text-2xl font-bold tracking-tight asis-neon-text">ASiS VPN</p>
+      {/* Brand header */}
+      <div className="flex flex-col items-center gap-2 pt-2 text-center">
+        <BrandLogo className="h-14 w-14" />
+        <p className="text-xl font-bold tracking-tight" dir="ltr">ASiS VPN</p>
         <h1 className="text-sm font-medium text-[var(--asis-text-secondary)]">
           {locale === 'fa-IR' ? 'به دنیای آزاد متصل شوید' : 'Connect to the open world'}
         </h1>
@@ -408,7 +406,12 @@ export function AuthForm({
       </Card>
 
       {/* Side Panel: Security Safeguards & Direct Subscription Import */}
-      <div className="space-y-6 text-start">
+      <details className="asis-details group text-start">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)]/60 px-4 py-3 text-sm font-medium text-[var(--asis-text-secondary)] transition-colors duration-150 hover:bg-[var(--asis-primary-soft)] hover:text-[var(--asis-text-primary)] [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" aria-hidden="true" />{t.securityNoteTitle}</span>
+          <span aria-hidden="true" className="text-xs transition-transform duration-200 group-open:rotate-180">▾</span>
+        </summary>
+        <div className="asis-view-enter space-y-6 pt-3">
         <Card className="space-y-4">
           <div className="flex items-center gap-2.5 text-[var(--asis-accent-fg)]">
             <ShieldCheck className="w-5 h-5 shrink-0" aria-hidden="true" />
@@ -455,7 +458,8 @@ export function AuthForm({
             </div>
           )}
         </Card>
-      </div>
+        </div>
+      </details>
 
       {/* Password Recovery Modal */}
       <Dialog

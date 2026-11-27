@@ -24,7 +24,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={ariaLabel}
-      className={`inline-flex items-center gap-1 rounded-xl border border-[var(--asis-border)] bg-[var(--asis-surface-2)] p-1 ${
+      className={`inline-flex items-center gap-0.5 rounded-full bg-[var(--asis-surface-2)] p-1 ${
         wrap ? 'flex-wrap' : ''
       }`}
     >
@@ -36,9 +36,9 @@ export function SegmentedControl<T extends string>({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(option.value)}
-            className={`min-h-[34px] rounded-lg px-3 py-1 text-xs font-medium whitespace-nowrap shrink-0 transition-all duration-150 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--asis-primary)] ${
+            className={`min-h-[34px] rounded-full px-4 py-1 text-[13px] font-medium whitespace-nowrap shrink-0 transition-all duration-150 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--asis-primary)] ${
               active
-                ? 'bg-[var(--asis-surface)] text-[var(--asis-text-primary)] shadow-[0_1px_2px_rgba(11,17,32,0.08)] dark:bg-[var(--asis-primary)] dark:text-white dark:shadow-[0_0_14px_-2px_rgba(var(--asis-glow-rgb),0.8)]'
+                ? 'bg-[var(--asis-primary)] text-white shadow-[0_6px_16px_-6px_rgba(var(--asis-glow-rgb),0.8)]'
                 : 'text-[var(--asis-text-secondary)] hover:text-[var(--asis-text-primary)]'
             }`}
           >

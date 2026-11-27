@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ChevronRight,
   Compass,
   LifeBuoy,
   Languages,
@@ -24,7 +25,6 @@ import {
   Input,
   SegmentedControl,
   StatusBanner,
-  ThemePaletteSwitcher,
   ToggleSwitch,
 } from '../../design-system/components';
 import type {
@@ -78,11 +78,14 @@ export function SettingsView({
   loadInstalledApplications,
   onNavigateToSupport,
 }: SettingsViewProps) {
-  const { locale, setLocale, themePreference, setThemePreference } = usePreferences();
+  const { locale, setLocale } = usePreferences();
   const isFa = locale === 'fa-IR';
   const isWeb = platform === 'web';
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') window.scrollTo?.({ top: 0 });
+  }, [showAdvanced]);
   const [updateInfo, setUpdateInfo] = useState<AppUpdateResponse | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
@@ -178,145 +181,27 @@ export function SettingsView({
     }
   })();
 
-  return (
-    <div className="space-y-5 text-start md:space-y-8">
-      <div className="hidden items-center gap-3.5 border-b border-[var(--asis-border)] pb-5 md:flex">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
-          <Settings className="w-5 h-5" aria-hidden="true" />
-        </div>
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">
-            {isFa ? 'تنظیمات و پیکربندی پیشرفته' : 'Settings & Advanced Connection Policy'}
-          </h2>
-          <p className="mt-0.5 text-sm text-[var(--asis-text-secondary)]">
-            {isFa
-              ? 'تنظیمات ظاهر، زبان، تونل‌سازی تفکیکی برنامه‌ها و پارامترهای اتصال'
-              : 'Language, appearance, per-app split tunneling, and platform-gated tunnel controls.'}
-          </p>
-        </div>
-      </div>
-
-      {/* Quick settings list (phone design) */}
-      <Card padding="none" className="divide-y divide-[var(--asis-border)]">
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-          <span className="flex items-center gap-3 text-sm font-medium">
-            <Languages className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            {isFa ? 'زبان برنامه' : 'Language'}
-          </span>
-          <SegmentedControl<LocaleCode>
-            ariaLabel="Language"
-            value={locale}
-            onChange={setLocale}
-            options={[
-              { value: 'fa-IR', label: 'فارسی' },
-              { value: 'en-US', label: 'English' },
-            ]}
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-          <span className="flex items-center gap-3 text-sm font-medium">
-            <Power className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            {isFa ? 'اتصال خودکار' : 'Auto reconnect'}
-          </span>
-          <ToggleSwitch
-            ariaLabel={isFa ? 'اتصال خودکار' : 'Auto reconnect'}
-            checked={policy.autoReconnect}
-            onChange={(next) => onPolicyChange({ ...policy, autoReconnect: next })}
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-          <span className="flex items-center gap-3 text-sm font-medium">
-            <Shuffle className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            {isFa ? 'اتوسوییچ بین سرورها' : 'Auto-switch servers'}
-          </span>
-          <ToggleSwitch
-            ariaLabel={isFa ? 'اتوسوییچ بین سرورها' : 'Auto-switch servers'}
-            checked={policy.autoSwitch === true}
-            onChange={(next) => onPolicyChange({ ...policy, autoSwitch: next })}
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-          <span className="flex items-center gap-3 text-sm font-medium">
-            <Power className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            {isFa ? 'اتصال خودکار هنگام باز شدن اپ' : 'Connect when the app opens'}
-          </span>
-          <ToggleSwitch
-            ariaLabel={isFa ? 'اتصال خودکار هنگام باز شدن اپ' : 'Connect when the app opens'}
-            checked={policy.autoConnect === true}
-            onChange={(next) => onPolicyChange({ ...policy, autoConnect: next })}
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-          <span className="flex items-center gap-3 text-sm font-medium">
-            <ShieldCheck className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            Kill Switch
-          </span>
-          <ToggleSwitch
-            ariaLabel="Kill Switch"
-            checked={policy.killSwitch}
-            disabled={isWeb}
-            onChange={(next) => onPolicyChange({ ...policy, killSwitch: next })}
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-          <span className="flex items-center gap-3 text-sm font-medium">
-            <Split className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            Split Tunneling
-          </span>
-          <span className="font-mono text-xs text-[var(--asis-text-secondary)]">{splitModeSummary}</span>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-          <span className="flex items-center gap-3 text-sm font-medium">
-            <ServerCog className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            {isFa ? 'DNS' : 'DNS'}
-          </span>
-          <span className="font-mono text-xs text-[var(--asis-text-secondary)]">
-            {policy.customDns || '1.1.1.1'}
-          </span>
-        </div>
-
-        {onNavigateToSupport && (
-          <button
-            type="button"
-            onClick={onNavigateToSupport}
-            className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-start cursor-pointer transition-colors hover:bg-[var(--asis-surface-2)]/70"
-          >
-            <span className="flex items-center gap-3 text-sm font-medium">
-              <LifeBuoy className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-              {isFa ? 'پشتیبانی و راهنما' : 'Support & Help'}
-            </span>
-          </button>
-        )}
-      </Card>
-
-      {/* Platform Limitation Notice */}
-      {isWeb && (
-        <StatusBanner
-          tone="info"
-          title={
-            isFa
-              ? 'محدودیت سیستم‌عامل در محیط وب'
-              : 'Platform Capability Enforcement (Web Preview)'
-          }
-          description={
-            isFa
-              ? 'تنظیمات سطح کرنل مانند Kill Switch و اسکن خودکار برنامه‌های نصب‌شده فقط در نسخه‌های بومی اندروید، iOS و ویندوز فعال می‌شوند.'
-              : 'Kernel-level controls such as Kill Switch and automatic OS app scanning activate only on native Android, iOS, or Windows builds.'
-          }
+  // Sub-page: only for users who need these controls.
+  const advancedPage = (
+    <div className="asis-view-enter space-y-5 text-start md:space-y-8">
+      <button
+        type="button"
+        onClick={() => setShowAdvanced(false)}
+        className="group -ms-1 inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-medium text-[var(--asis-text-primary)] transition-all duration-150 hover:bg-[var(--asis-primary-soft)] active:scale-[0.97] cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--asis-primary)]"
+      >
+        <ChevronRight
+          className={`h-5 w-5 transition-transform duration-150 ${isFa ? 'group-hover:translate-x-0.5' : 'rotate-180 group-hover:-translate-x-0.5'}`}
+          aria-hidden="true"
         />
-      )}
+        {isFa ? 'تنظیمات' : 'Settings'}
+      </button>
+      <h2 className="text-xl font-semibold tracking-tight">{isFa ? 'تنظیمات پیشرفته' : 'Advanced'}</h2>
 
       {/* Split Tunneling & App Selection */}
       <Card className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--asis-border)] pb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
               <ShieldAlert className="w-4 h-4" aria-hidden="true" />
             </div>
             <div>
@@ -366,23 +251,10 @@ export function SettingsView({
         />
       </Card>
 
-      <button
-        type="button"
-        onClick={() => setShowAdvanced((v) => !v)}
-        aria-expanded={showAdvanced}
-        className="flex w-full items-center justify-between rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)] px-4 py-3.5 text-sm font-medium cursor-pointer"
-      >
-        <span className="flex items-center gap-3">
-          <Sliders className="h-4 w-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-          {isFa ? 'تنظیمات پیشرفته' : 'Advanced'}
-        </span>
-        <span className="text-xs text-[var(--asis-text-secondary)]">{showAdvanced ? '−' : '+'}</span>
-      </button>
-
       {/* Advanced Connection Settings */}
-      <Card className={`space-y-6 ${showAdvanced ? '' : 'hidden'}`}>
+      <Card className="space-y-6">
         <div className="flex items-center gap-3 border-b border-[var(--asis-border)] pb-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
             <Sliders className="w-4 h-4" aria-hidden="true" />
           </div>
           <div>
@@ -490,7 +362,7 @@ export function SettingsView({
 
           <div className="flex items-center justify-between gap-4 py-3.5 text-sm">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
                 <Network className="h-4 w-4" aria-hidden="true" />
               </div>
               <div className="min-w-0">
@@ -512,6 +384,195 @@ export function SettingsView({
           </div>
         </div>
       </Card>
+
+    </div>
+  );
+  if (showAdvanced) return advancedPage;
+
+  return (
+    <div className="space-y-5 text-start md:space-y-8">
+      <div className="hidden items-center gap-3.5 border-b border-[var(--asis-border)] pb-5 md:flex">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
+          <Settings className="w-5 h-5" aria-hidden="true" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {isFa ? 'تنظیمات و پیکربندی پیشرفته' : 'Settings & Advanced Connection Policy'}
+          </h2>
+          <p className="mt-0.5 text-sm text-[var(--asis-text-secondary)]">
+            {isFa
+              ? 'تنظیمات ظاهر، زبان، تونل‌سازی تفکیکی برنامه‌ها و پارامترهای اتصال'
+              : 'Language, appearance, per-app split tunneling, and platform-gated tunnel controls.'}
+          </p>
+        </div>
+      </div>
+
+      {/* Settings, grouped by what they do */}
+      {(() => {
+        const Row = ({
+          icon: Icon,
+          title,
+          hint,
+          children,
+        }: {
+          icon: React.ComponentType<{ className?: string }>;
+          title: string;
+          hint?: string;
+          children: React.ReactNode;
+        }) => (
+          <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--asis-surface-2)] text-[var(--asis-text-secondary)]">
+                <Icon className="h-[18px] w-[18px]" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{title}</span>
+                {hint && <span className="block text-xs leading-5 text-[var(--asis-text-secondary)]">{hint}</span>}
+              </span>
+            </span>
+            <span className="shrink-0">{children}</span>
+          </div>
+        );
+        const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
+          <section className="space-y-2">
+            <h3 className="px-1 text-[13px] font-semibold text-[var(--asis-text-secondary)]">{title}</h3>
+            <Card padding="none" className="divide-y divide-[var(--asis-border)] overflow-hidden">
+              {children}
+            </Card>
+          </section>
+        );
+        return (
+          <>
+            <Group title={isFa ? 'عمومی' : 'General'}>
+              <Row icon={Languages} title={isFa ? 'زبان برنامه' : 'Language'}>
+                <SegmentedControl<LocaleCode>
+                  ariaLabel="Language"
+                  value={locale}
+                  onChange={setLocale}
+                  options={[
+                    { value: 'fa-IR', label: 'فارسی' },
+                    { value: 'en-US', label: 'English' },
+                  ]}
+                />
+              </Row>
+            </Group>
+
+            <Group title={isFa ? 'اتصال' : 'Connection'}>
+              <Row
+                icon={Power}
+                title={isFa ? 'اتصال مجدد خودکار' : 'Auto reconnect'}
+                hint={isFa ? 'اگر اتصال قطع شد، دوباره وصل می‌شود' : 'Reconnects if the connection drops'}
+              >
+                <ToggleSwitch
+                  ariaLabel={isFa ? 'اتصال مجدد خودکار' : 'Auto reconnect'}
+                  checked={policy.autoReconnect}
+                  onChange={(next) => onPolicyChange({ ...policy, autoReconnect: next })}
+                />
+              </Row>
+              <Row
+                icon={Power}
+                title={isFa ? 'اتصال هنگام باز شدن برنامه' : 'Connect on launch'}
+                hint={isFa ? 'با باز کردن برنامه خودکار وصل می‌شود' : 'Connects as soon as the app opens'}
+              >
+                <ToggleSwitch
+                  ariaLabel={isFa ? 'اتصال هنگام باز شدن برنامه' : 'Connect on launch'}
+                  checked={policy.autoConnect === true}
+                  onChange={(next) => onPolicyChange({ ...policy, autoConnect: next })}
+                />
+              </Row>
+              <Row
+                icon={Shuffle}
+                title={isFa ? 'تعویض خودکار سرور' : 'Auto-switch servers'}
+                hint={isFa ? 'اگر سرور کند شد، به سرور بهتر می‌رود' : 'Moves to a faster server when yours slows down'}
+              >
+                <ToggleSwitch
+                  ariaLabel={isFa ? 'تعویض خودکار سرور' : 'Auto-switch servers'}
+                  checked={policy.autoSwitch === true}
+                  onChange={(next) => onPolicyChange({ ...policy, autoSwitch: next })}
+                />
+              </Row>
+            </Group>
+
+            <Group title={isFa ? 'امنیت و شبکه' : 'Security & network'}>
+              <Row
+                icon={ShieldCheck}
+                title="Kill Switch"
+                hint={isFa ? 'با قطع VPN اینترنت هم قطع می‌شود' : 'Blocks internet if the VPN drops'}
+              >
+                <ToggleSwitch
+                  ariaLabel="Kill Switch"
+                  checked={policy.killSwitch}
+                  disabled={isWeb}
+                  onChange={(next) => onPolicyChange({ ...policy, killSwitch: next })}
+                />
+              </Row>
+              <Row icon={Split} title="Split Tunneling">
+                <span className="font-mono text-xs text-[var(--asis-text-secondary)]">{splitModeSummary}</span>
+              </Row>
+              <Row icon={ServerCog} title="DNS">
+                <span className="font-mono text-xs text-[var(--asis-text-secondary)]" dir="ltr">
+                  {policy.customDns || '1.1.1.1'}
+                </span>
+              </Row>
+            </Group>
+
+            {onNavigateToSupport && (
+              <Group title={isFa ? 'کمک' : 'Help'}>
+                <button
+                  type="button"
+                  onClick={onNavigateToSupport}
+                  className="flex w-full cursor-pointer items-center justify-between gap-3 text-start transition-colors hover:bg-[var(--asis-surface-2)]"
+                >
+                  <Row icon={LifeBuoy} title={isFa ? 'پشتیبانی و راهنما' : 'Support & help'}>
+                    <ChevronRight
+                      className={`h-4 w-4 text-[var(--asis-text-secondary)] ${isFa ? 'rotate-180' : ''}`}
+                      aria-hidden="true"
+                    />
+                  </Row>
+                </button>
+              </Group>
+            )}
+          </>
+        );
+      })()}
+
+      {/* Platform Limitation Notice */}
+      {isWeb && (
+        <StatusBanner
+          tone="info"
+          title={
+            isFa
+              ? 'محدودیت سیستم‌عامل در محیط وب'
+              : 'Platform Capability Enforcement (Web Preview)'
+          }
+          description={
+            isFa
+              ? 'تنظیمات سطح کرنل مانند Kill Switch و اسکن خودکار برنامه‌های نصب‌شده فقط در نسخه‌های بومی اندروید، iOS و ویندوز فعال می‌شوند.'
+              : 'Kernel-level controls such as Kill Switch and automatic OS app scanning activate only on native Android, iOS, or Windows builds.'
+          }
+        />
+      )}
+
+      {/* Advanced settings: a separate sub-page, opened from this row */}
+      <button
+        type="button"
+        onClick={() => setShowAdvanced(true)}
+        className="asis-glass group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3.5 text-start transition-all duration-200 hover:brightness-110 active:scale-[0.985] cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--asis-primary)]"
+      >
+        <span className="flex items-center gap-3">
+          <Sliders className="h-4 w-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+          <span>
+            <span className="block text-sm font-medium">{isFa ? 'تنظیمات پیشرفته' : 'Advanced'}</span>
+            <span className="block text-xs text-[var(--asis-text-secondary)]">
+              {isFa ? 'تونل‌سازی تفکیکی، DNS، MTU و سیاست اتصال' : 'Split tunneling, DNS, MTU and connection policy'}
+            </span>
+          </span>
+        </span>
+        <ChevronRight
+          className={`h-4 w-4 shrink-0 text-[var(--asis-text-secondary)] transition-transform duration-200 group-hover:translate-x-0.5 ${isFa ? 'rotate-180 group-hover:-translate-x-0.5' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
 
       {/* Update Check & About */}
       <Card className="flex flex-wrap items-center justify-between gap-4">

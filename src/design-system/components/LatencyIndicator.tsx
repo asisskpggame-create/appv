@@ -32,11 +32,11 @@ export function LatencyIndicator({
 
   const colorClass =
     tier === 'fast'
-      ? 'text-[#16A34A] dark:text-[#4ADE80]'
+      ? 'text-[#2BB673] dark:text-[#3BC48A]'
       : tier === 'medium'
-        ? 'text-[#D97706] dark:text-[#FBBF24]'
+        ? 'text-[#B7791F] dark:text-[#E0A030]'
         : tier === 'slow' || tier === 'unreachable'
-          ? 'text-[#DC2626] dark:text-[#F87171]'
+          ? 'text-[#D64545] dark:text-[#F07070]'
           : 'text-[var(--asis-text-secondary)]';
 
   const activeBars =

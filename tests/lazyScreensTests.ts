@@ -13,7 +13,7 @@ test('shell loads Account, Settings, Statistics, Support and Gateway screens on 
     ['SupportView', 'features/support/SupportView'],
     ['GatewayStatusView', 'features/gateway/GatewayStatusView'],
   ]) {
-    assert.match(shell, new RegExp(`const ${name} = lazy\\(\\(\\) => import\\('\\.\\./${path}'\\)`), `${name} must be lazy`);
+    assert.match(shell, new RegExp(`const ${name} = lazy\\(\\(\\) =>\\s*import\\('\\.\\./${path}'\\)`), `${name} must be lazy`);
     assert.doesNotMatch(shell, new RegExp(`^import \\{[^}]*\\b${name}\\b[^}]*\\} from`, 'm'), `${name} must not be imported statically`);
   }
   assert.match(shell, /<LazyScreen screen=\{screen\}>/);

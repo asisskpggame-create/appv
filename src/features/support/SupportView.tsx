@@ -194,7 +194,7 @@ export function SupportView({
             <Button
               variant="outline"
               size="sm"
-              icon={copied ? <CheckCircle2 className="w-4 h-4 text-[#16A34A]" /> : <Copy className="w-4 h-4" />}
+              icon={copied ? <CheckCircle2 className="w-4 h-4 text-[#2BB673]" /> : <Copy className="w-4 h-4" />}
               onClick={() => void handleCopyReport()}
             >
               {copied ? (isFa ? 'کپی شد' : 'Copied') : isFa ? 'کپی گزارش امن' : 'Copy Redacted Report'}
@@ -227,10 +227,10 @@ export function SupportView({
               <span
                 className={`font-mono text-xs font-semibold ${
                   item.status === 'pass'
-                    ? 'text-[#16A34A] dark:text-[#4ADE80]'
+                    ? 'text-[#2BB673] dark:text-[#3BC48A]'
                     : item.status === 'warn'
-                      ? 'text-[#D97706] dark:text-[#FBBF24]'
-                      : 'text-[#DC2626] dark:text-[#F87171]'
+                      ? 'text-[#B7791F] dark:text-[#E0A030]'
+                      : 'text-[#D64545] dark:text-[#F07070]'
                 }`}
               >
                 {item.status.toUpperCase()}

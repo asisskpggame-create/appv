@@ -98,7 +98,7 @@ export function KillSwitchSettings({
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
               enabled && !isWeb
-                ? 'bg-[#DCFCE7] text-[#16A34A] dark:bg-[#0D2E1E] dark:text-[#4ADE80]'
+                ? 'bg-[#DCFCE7] text-[#2BB673] dark:bg-[#0D2E1E] dark:text-[#3BC48A]'
                 : 'bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]'
             }`}
           >
@@ -185,7 +185,7 @@ export function KillSwitchSettings({
               isWeb
                 ? 'text-[var(--asis-text-secondary)]'
                 : enabled
-                  ? 'text-[#16A34A] dark:text-[#4ADE80]'
+                  ? 'text-[#2BB673] dark:text-[#3BC48A]'
                   : 'text-[var(--asis-text-secondary)]'
             }`}
           >

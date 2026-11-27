@@ -495,7 +495,7 @@ export function SplitTunnelingAppSelector({
                       aria-label={
                         isFa ? `حذف قانون ${app.name}` : `Remove rule for ${app.name}`
                       }
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#FEF2F2] hover:text-[#DC2626] dark:text-[#94A3B8] dark:hover:bg-[#3A0C12]/50 dark:hover:text-[#F87171] cursor-pointer"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#FEF2F2] hover:text-[#D64545] dark:text-[#94A3B8] dark:hover:bg-[#3A0C12]/50 dark:hover:text-[#F07070] cursor-pointer"
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>

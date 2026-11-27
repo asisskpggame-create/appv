@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link2, Lock, User } from 'lucide-react';
 import { usePreferences } from '../../design-system/ThemeContext';
-import { BrandLogo, Button, Dialog, Input, StatusBanner } from '../../design-system/components';
+import { BrandLogo, Button, Dialog, Input, SegmentedControl, StatusBanner } from '../../design-system/components';
 import { authTranslations } from './authTranslations';
 import { AuthClientError, HttpAuthClient, createDiagnosticId } from './authClient';
 import { getStableDeviceId, isNativeApp } from './sessionStore';
@@ -14,51 +14,6 @@ interface LoginScreenProps {
   /** Lets people without an account add a subscription link by hand. */
   onContinueWithoutAccount?: () => void;
   initialSessionExpired?: boolean;
-}
-
-/** Glowing city skyline (Tehran, Milad Tower) used at the bottom of the login screen. */
-function Skyline() {
-  const buildings: Array<[number, number, number]> = [
-    [0, 70, 26], [26, 100, 22], [48, 60, 30], [78, 120, 20], [98, 84, 28], [126, 54, 24],
-    [250, 90, 26], [276, 130, 22], [298, 76, 30], [328, 108, 24], [352, 66, 28], [380, 96, 20],
-  ];
-  return (
-    <svg
-      viewBox="0 0 400 200"
-      preserveAspectRatio="xMidYMax slice"
-      className="pointer-events-none absolute inset-x-0 bottom-0 h-[34%] w-full"
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id="sk-fade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#1D86FF" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#030816" stopOpacity="0.95" />
-        </linearGradient>
-        <linearGradient id="sk-tower" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#9BD0FF" />
-          <stop offset="1" stopColor="#1D86FF" />
-        </linearGradient>
-      </defs>
-      <ellipse cx="200" cy="210" rx="260" ry="70" fill="#1D86FF" opacity="0.28" />
-      {buildings.map(([x, h, w], i) => (
-        <g key={i}>
-          <rect x={x} y={200 - h} width={w} height={h} fill="url(#sk-fade)" stroke="#3B98FF" strokeOpacity="0.5" strokeWidth="0.6" />
-          {Array.from({ length: Math.floor(h / 14) }).map((_, r) => (
-            <rect key={r} x={x + 5} y={200 - h + 8 + r * 14} width={w - 10} height="2" fill="#9BD0FF" opacity={r % 3 === 0 ? 0.2 : 0.55} />
-          ))}
-        </g>
-      ))}
-      {/* Milad Tower */}
-      <g stroke="#9BD0FF" strokeWidth="0.8" fill="url(#sk-tower)">
-        <path d="M196 200 L199 78 L201 78 L204 200 Z" />
-        <ellipse cx="200" cy="72" rx="13" ry="7" />
-        <ellipse cx="200" cy="62" rx="9" ry="4" />
-        <rect x="199.3" y="26" width="1.4" height="36" />
-        <path d="M185 200 L196 120 L204 120 L215 200 Z" opacity="0.8" />
-      </g>
-      <rect x="0" y="198" width="400" height="2" fill="#3B98FF" opacity="0.7" />
-    </svg>
-  );
 }
 
 export function LoginScreen({
@@ -189,60 +144,85 @@ export function LoginScreen({
 
   const err = authError ? errorText(authError) : null;
 
+  const inputCls = '!bg-[var(--asis-surface-2)]/60';
   return (
-    <div
-      className="relative flex min-h-screen flex-col overflow-hidden text-[var(--asis-text-primary)]"
-      style={{
-        background:
-          'radial-gradient(ellipse 90% 45% at 50% 18%, rgba(29,134,255,0.38), transparent 70%), linear-gradient(180deg, #030816 0%, #061433 60%, #030816 100%)',
-      }}
-    >
-      {/* star-dust */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-70"
-        style={{
-          backgroundImage:
-            'radial-gradient(rgba(150,200,255,0.55) 1px, transparent 1.2px), radial-gradient(rgba(150,200,255,0.3) 1px, transparent 1.2px)',
-          backgroundSize: '46px 46px, 71px 71px',
-          backgroundPosition: '0 0, 20px 30px',
-          WebkitMaskImage: 'linear-gradient(180deg, #000, transparent 70%)',
-          maskImage: 'linear-gradient(180deg, #000, transparent 70%)',
-        }}
-      />
-
-      <Skyline />
-
-      {/* Language */}
-      <div className="relative z-10 flex justify-end px-5 pt-4">
-        <button
-          type="button"
-          onClick={() => setLocale(isFa ? 'en-US' : 'fa-IR')}
-          className="rounded-full border border-[#1F4C9C] bg-[#0A1630]/70 px-3.5 py-1.5 text-xs font-semibold text-[#9BD0FF] backdrop-blur"
+    <div className="asis-canvas-ambient flex min-h-screen flex-col text-[var(--asis-text-primary)]">
+      {/* Brand area */}
+      <section className="relative overflow-hidden px-6 pb-14 pt-4">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 400 260"
+          className="pointer-events-none absolute inset-x-0 top-0 h-full w-full text-[var(--asis-primary)]"
+          preserveAspectRatio="xMidYMid slice"
         >
-          {isFa ? 'English' : 'فارسی'}
-        </button>
-      </div>
+          <g fill="none" stroke="currentColor">
+            <circle cx="200" cy="120" r="64" strokeOpacity="0.16" />
+            <circle cx="200" cy="120" r="104" strokeOpacity="0.11" />
+            <circle cx="200" cy="120" r="148" strokeOpacity="0.07" />
+            <circle cx="200" cy="120" r="196" strokeOpacity="0.045" />
+          </g>
+        </svg>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col px-6 pb-[22vh] pt-2">
-        {/* Brand */}
-        <div className="flex flex-col items-center gap-3 pb-6 text-center">
-          <BrandLogo glow className="h-40 w-40 shadow-[0_0_46px_6px_rgba(29,134,255,0.5)]" />
-          <h1 className="text-[28px] font-extrabold tracking-wide text-white [text-shadow:0_0_18px_rgba(59,152,255,0.9)]" dir="ltr">
-            ASiS VPN
-          </h1>
-          <p className="text-sm text-[#9DB6DC]">
-            {isFa ? 'به دنیای آزاد متصل شوید' : 'Connect to the open world'}
-          </p>
+        <div className="relative flex justify-end">
+          <button
+            type="button"
+            onClick={() => setLocale(isFa ? 'en-US' : 'fa-IR')}
+            className="asis-glass cursor-pointer rounded-full px-3.5 py-1.5 text-xs font-medium text-[var(--asis-text-secondary)]"
+          >
+            {isFa ? 'English' : 'فارسی'}
+          </button>
+        </div>
+
+        <div className="relative mt-2 flex flex-col items-center gap-3 text-center">
+          <div className="relative flex h-28 w-28 items-center justify-center">
+            <span
+              aria-hidden="true"
+              className="asis-orb absolute inset-0 rounded-full opacity-25"
+            />
+            <span aria-hidden="true" className="asis-halo" />
+            <BrandLogo className="relative h-20 w-20" glow />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight" dir="ltr">
+              ASiS VPN
+            </h1>
+            <p className="text-sm text-[var(--asis-text-secondary)]">
+              {isFa ? 'اینترنت آزاد، امن و پایدار' : 'Open, secure, reliable internet'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Sign-in sheet */}
+      <div className="asis-glass relative -mt-6 flex-1 rounded-t-[28px] px-6 pb-10 pt-7">
+        <div className="mx-auto w-full max-w-md">
+        <h2 className="mb-1 text-lg font-bold">{isFa ? 'ورود به حساب' : 'Sign in'}</h2>
+        <p className="mb-5 text-sm text-[var(--asis-text-secondary)]">
+          {isFa ? 'با نام کاربری یا لینک اشتراک وارد شوید.' : 'Use your username or a subscription link.'}
+        </p>
+
+        <div className="mb-5 [&>div]:flex [&>div]:w-full [&>div>button]:flex-1">
+          <SegmentedControl<'password' | 'link'>
+            ariaLabel={isFa ? 'روش ورود' : 'Sign-in method'}
+            value={mode}
+            onChange={(next) => {
+              setMode(next);
+              setAuthError(null);
+            }}
+            options={[
+              { value: 'password', label: isFa ? 'نام کاربری' : 'Username' },
+              { value: 'link', label: isFa ? 'لینک اشتراک' : 'Subscription link' },
+            ]}
+          />
         </div>
 
         {err && (
-          <div className="mb-3">
+          <div className="mb-4">
             <StatusBanner tone={authError?.category === 'backend_unavailable' ? 'warning' : 'error'} title={err.title} description={err.body} />
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {mode === 'password' ? (
             <>
               <Input
@@ -253,7 +233,6 @@ export function LoginScreen({
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder={t.usernameLabel}
                 value={username}
                 disabled={isLoading}
                 error={usernameError}
@@ -261,7 +240,7 @@ export function LoginScreen({
                   setUsername(e.target.value);
                   if (authError) setAuthError(null);
                 }}
-                className="!min-h-[52px] !rounded-2xl !border-[#23509C]/70 !bg-[#0D2349]/70 !text-base"
+                className={inputCls}
               />
               <Input
                 label={t.passwordLabel}
@@ -272,7 +251,6 @@ export function LoginScreen({
                 allowPasswordToggle
                 showPasswordLabel={t.showPasswordLabel}
                 hidePasswordLabel={t.hidePasswordLabel}
-                placeholder={t.passwordLabel}
                 value={password}
                 disabled={isLoading}
                 error={passwordError}
@@ -280,8 +258,22 @@ export function LoginScreen({
                   setPassword(e.target.value);
                   if (authError) setAuthError(null);
                 }}
-                className="!min-h-[52px] !rounded-2xl !border-[#23509C]/70 !bg-[#0D2349]/70 !text-base"
+                className={inputCls}
               />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecoveryUsername(username);
+                    setRecoveryError(null);
+                    setRecoveryNotice(null);
+                    setRecoveryOpen(true);
+                  }}
+                  className="text-[13px] font-medium text-[var(--asis-accent-fg)]"
+                >
+                  {isFa ? 'رمز عبور را فراموش کرده‌اید؟' : 'Forgot your password?'}
+                </button>
+              </div>
             </>
           ) : (
             <Input
@@ -303,64 +295,36 @@ export function LoginScreen({
                 setLink(e.target.value);
                 if (authError) setAuthError(null);
               }}
-              className="!min-h-[52px] !rounded-2xl !border-[#23509C]/70 !bg-[#0D2349]/70 !text-base"
+              className={inputCls}
             />
           )}
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            loading={isLoading}
-            className="!min-h-[54px] w-full !rounded-2xl !text-base !font-bold"
-          >
+          <Button type="submit" variant="primary" size="lg" loading={isLoading} className="w-full !rounded-full">
             {isLoading ? t.submitSigningIn : isFa ? 'ورود' : 'Sign in'}
           </Button>
         </form>
 
-        <div className="mt-5 flex flex-col items-center gap-3 text-sm">
-          <button
-            type="button"
-            onClick={() => {
-              setMode(mode === 'password' ? 'link' : 'password');
-              setAuthError(null);
-            }}
-            className="font-medium text-[#5FB0FF]"
-          >
-            {mode === 'password'
-              ? isFa ? 'ورود با لینک اشتراک' : 'Sign in with subscription link'
-              : isFa ? 'ورود با نام کاربری و رمز' : 'Sign in with username'}
-          </button>
-          {mode === 'password' && (
-            <button
-              type="button"
-              onClick={() => {
-                setRecoveryUsername(username);
-                setRecoveryError(null);
-                setRecoveryNotice(null);
-                setRecoveryOpen(true);
-              }}
-              className="text-[#9DB6DC]"
-            >
-              {isFa ? 'رمز عبور خود را فراموش کرده‌اید؟' : 'Forgot your password?'}
-            </button>
-          )}
-          {mode === 'password' && SIGNUP_URL && (
-            <button
-              type="button"
-              onClick={() => {
-                if (SIGNUP_URL) window.open(SIGNUP_URL, '_blank', 'noopener,noreferrer');
-              }}
-              className="text-[#9DB6DC]"
-            >
-              {isFa ? 'ثبت‌نام در حساب کاربری' : 'Create an account'}
-            </button>
-          )}
-          {onContinueWithoutAccount && (
-            <button type="button" onClick={onContinueWithoutAccount} className="text-[#9DB6DC]">
-              {isFa ? 'ادامه بدون حساب (افزودن دستی اشتراک)' : 'Continue without an account'}
-            </button>
-          )}
+        {(SIGNUP_URL || onContinueWithoutAccount) && (
+          <div className="mt-8 flex flex-col gap-2.5 border-t border-[var(--asis-border)] pt-6">
+            {mode === 'password' && SIGNUP_URL && (
+              <Button
+                variant="outline"
+                size="md"
+                className="w-full"
+                onClick={() => {
+                  if (SIGNUP_URL) window.open(SIGNUP_URL, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                {isFa ? 'ساخت حساب کاربری' : 'Create an account'}
+              </Button>
+            )}
+            {onContinueWithoutAccount && (
+              <Button variant="ghost" size="md" className="w-full" onClick={onContinueWithoutAccount}>
+                {isFa ? 'ادامه بدون حساب' : 'Continue without an account'}
+              </Button>
+            )}
+          </div>
+        )}
         </div>
       </div>
 

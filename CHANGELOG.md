@@ -1,3 +1,10 @@
+## Step 55 — Full visual redesign (flat, professional)
+- New flat palette (graphite + one calm blue); green only for "connected", red only for errors. No neon, glow, glass or dot grids.
+- Home: status + timer, one clean connect control, server row, session traffic card.
+- Login: no skyline; brand, method tabs (username / subscription link), form, secondary actions.
+- Settings: grouped sections (General, Connection, Security & network, Help) with one-line hints.
+- Bottom tab bar: flat, active pill. Base components (Card, Button, Input, Toggle, Segmented, Banner) restyled.
+
 ## Lazy-loaded screens (0.4.12, step 17)
 - **UI code change** (`src/client/AsisClientShell.tsx`, new `src/client/LazyScreen.tsx`): the Account, Settings, Statistics, Support and Gateway-status screens now load when first opened (`React.lazy`). Home, Servers and Subscriptions stay in the first download. While a screen loads, a small spinner shows (no text, nothing to translate); if the download fails (offline), the person sees an English + Persian message with a Reload button instead of a blank page; going to another screen clears it.
 - **Effect on size** (from `npm run build`): the app chunk went 290 kB -> 181 kB; the charts library (recharts) no longer loads at start, it comes with the Statistics screen (`statistics-*.js`, 463 kB). First load is now index 181 kB + react 218 kB + CSS. `vite.config.ts`: the manual `charts` chunk group from 0.4.9 was removed (it pulled recharts back into the first download); the `react` group stays.
@@ -222,6 +229,41 @@
   - Bilingual `en-US` (LTR) and `fa-IR` (RTL) localization provider with `Plus Jakarta Sans`, `Vazirmatn`, and `JetBrains Mono` typography.
   - Reusable commercial UI components: `BrandLogo`, `Button`, `Card`, `Input`, `SegmentedControl`, `StatusBanner`, `Dialog`, `Skeleton`, `EmptyState`, `ErrorState`.
   - Phase 1 Design System & Architecture Verification Workbench in `src/App.tsx`.
+
+## 0.4.30 (steps 43 - 45)
+- **Statistics:** download and upload are now a pair of cards, and "مصرف کل" is its own large card under them (design). **Home:** the idle / connecting Power button is a dark navy disc with a neon-blue ring and a glowing blue icon (design); connected (green) and error looks are unchanged. Both use the existing theme variables.
+- **Repo:** the design image is kept at `docs/design/reference.png`; `TODO-UI.md` got a "current status" section and its ticks match the code.
+- **Tests:** 2 more source-guard tests in `tests/designGapTests.ts` (8 in the file, all pass with `node --test`).
+- **NOT run:** `tsc`, `npm run build`, any render (no `node_modules` here). Colors of the Power button are estimated from the image by eye.
+
+## 0.4.35 (step 54, from owner screenshots)
+- **Sign-in:** the three links at the bottom sat on top of the Milad Tower. The skyline is now 22% of the screen height (was 34%), the content has more room above it (`pb-[26vh]`), the logo is a little smaller (h-36) and the links have a soft shadow for legibility. "ادامه بدون حساب (افزودن دستی اشتراک)" is shortened to "ادامه بدون حساب".
+- **Settings:** the first switch was labelled "اتصال خودکار" but is "Auto reconnect"; it now says "اتصال مجدد خودکار", so it no longer looks like a duplicate of "اتصال خودکار هنگام باز شدن اپ".
+- **Account (signed out):** one clean logo instead of a logo inside a ring; the long "token protection" card is a collapsed section.
+- **Seen in the screenshots, not changed:** the Home Power disc was solid blue and the Split Tunneling card was still on the main Settings page, so that build did not have steps 51 - 52; check which zip it was built from. The floating Chrome icon on every screenshot is a screen overlay, not the app.
+- **Checks:** 13 tests pass; `tsc` (missing React types): no new errors. Not built or rendered; the skyline/link spacing is calculated from the screenshot, not seen.
+
+## 0.4.34 (step 53)
+- **Statistics:** the "server usage vs local counters" cards moved from the top of the screen to a collapsed "جزئیات فنی مصرف" section under the chart (`<details>`, closed by default), so the screen opens on tabs, chart, download/upload and total, like the design. Nothing was removed; the data and sync button are still there.
+- **Subscriptions:** the account/manual tab switch shows only when there is at least one account subscription (or the account tab is open). The "افزودن اشتراک جدید" link still opens the manual-import tab.
+- **Checks:** 12 tests pass (`designGapTests`, `lazyScreensTests`); `tsc` with missing React types: no new errors, no syntax errors. Not built, not rendered.
+
+## 0.4.33 (step 52)
+- **Bottom tab bar:** hover and keyboard focus styles, a press response, a soft pill behind the active tab, and the active bar grows in (220 ms, off with reduced motion). **Server rows (phone):** hover lift, glow border and press response; the selected row keeps its neon border.
+- **Looked at, left as is:** the smart-selection policy card is already hidden on phones (`hidden md:block`); it only shows on desktop.
+- **Checks:** 11 tests in `designGapTests` + `lazyScreensTests` pass; `tsc` (missing React types) shows no new errors. Not built, not rendered; the look of the hover and the pill is unchecked.
+
+## 0.4.32 (step 51)
+- **Settings:** "Advanced" is now a separate sub-page (row with a short description and a chevron on the main list; the page has a back button and the view-enter animation, and scrolls to the top). Split tunneling / app selection and the advanced tunnel settings moved into it; the main list keeps language, auto-connect, kill switch, support and the version/update card. Before, one card toggled open in place.
+- **Touch feedback:** on devices without hover, every enabled `button` shrinks slightly while pressed (`index.css`, off when the user asks for reduced motion). The new rows also have hover and focus styles.
+- **Statistics:** no change needed; the source and chart-style switches were already hidden, only daily / weekly / monthly show.
+- **Not done (needs a look at the real screens):** Servers smart-selection policy, Subscriptions tabs / import methods (owner did not pick them), extra cards on Statistics below the chart, hover/press polish for list rows and the bottom tab bar.
+- **Checks:** `designGapTests` + `lazyScreensTests` 10/10; `tsc` with missing React types shows no new errors (one fewer). Not built, not rendered.
+
+## 0.4.31 (step 47)
+- **Decision, no code change:** the "تم برنامه" row from the design image is NOT built. The UI stays dark-only (locked in 0.4.13); a theme row with one choice, or a "light" option that does nothing, would be misleading. Revisit only if a light theme is brought back. The notifications and smart-DNS rows stay unbuilt for the same reason (no function behind them).
+- **Cleanup:** removed the unused `ThemePaletteSwitcher` import and the unused `themePreference` / `setThemePreference` from `SettingsView.tsx` (checked by grep: no other use in the file). `tsc` not run here.
+- **Test fix:** `tests/lazyScreensTests.ts` failed on the 0.4.28 code ("GatewayStatusView must be lazy") although the screen is lazy: its `import()` sits on the next line and the regex wanted one line. The regex now allows whitespace/newline after `=>`. Found by running `node --test` on the unzipped project; the same failure shows on the original zip, so it is not from this step.
 
 ## 0.4.28 (step 42)
 - **Compared the app with the design image** (`1000133315.png`) by reading the code, not by rendering it. Changes:

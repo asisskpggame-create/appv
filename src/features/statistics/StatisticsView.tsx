@@ -69,7 +69,7 @@ function TrafficChartTooltip({ active, payload, isFa, unavailableLabel }: Traffi
   return (
     <div
       dir={isFa ? 'rtl' : 'ltr'}
-      className="min-w-[180px] rounded-xl border border-[var(--asis-border)] bg-[var(--asis-surface)] px-3.5 py-2.5 text-xs shadow-sm"
+      className="asis-glass min-w-[180px] rounded-2xl px-3.5 py-2.5 text-xs"
     >
       <p className="border-b border-[var(--asis-border)] pb-1.5 font-mono text-[11px] font-medium text-[var(--asis-text-secondary)]">
         {datum.label}
@@ -257,138 +257,6 @@ export function StatisticsView({
         </Button>
       </div>
 
-      {/* Authoritative Server-Side Usage vs Local Engine Counters */}
-      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
-        <Card className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold">
-              {isFa ? 'مصرف رسمی اشتراک (سمت سرور)' : 'Authoritative Subscription Usage (Server)'}
-            </h3>
-            <span
-              className={`font-mono text-xs whitespace-nowrap shrink-0 ${
-                serverUsage || activeSubscription?.source === 'account'
-                  ? 'text-[#16A34A] dark:text-[#4ADE80]'
-                  : 'text-[#D97706] dark:text-[#FBBF24]'
-              }`}
-            >
-              {serverUsage || activeSubscription?.source === 'account'
-                ? 'Server Authoritative'
-                : 'NOT CONNECTED'}
-            </span>
-          </div>
-
-          {usageError && <StatusBanner tone="warning" title={usageError} />}
-
-          {loadingUsage ? (
-            <UsageMetricsSkeleton />
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 text-xs">
-                <div>
-                  <p className="text-[var(--asis-text-secondary)]">{isFa ? 'کل حجم' : 'Total'}</p>
-                  <p className="mt-1 font-mono text-sm font-semibold">
-                    {formatBytesCompact(quota.totalBytes, unavailable)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[var(--asis-text-secondary)]">{isFa ? 'مصرف‌شده' : 'Used'}</p>
-                  <p className="mt-1 font-mono text-sm font-semibold">
-                    {formatBytesCompact(quota.usedBytes, unavailable)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[var(--asis-text-secondary)]">{isFa ? 'باقیمانده' : 'Remaining'}</p>
-                  <p className="mt-1 font-mono text-sm font-semibold">
-                    {formatBytesCompact(quota.remainingBytes, unavailable)}
-                  </p>
-                </div>
-              </div>
-
-              {quota.usedPercent !== null && (
-                <div className="space-y-1.5 border-t border-[var(--asis-border)] pt-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[var(--asis-text-secondary)]">
-                      {isFa ? 'سهمیه مصرف‌شده' : 'Quota utilization'}
-                    </span>
-                    <span className="font-mono font-semibold text-[var(--asis-text-primary)]">
-                      {quota.usedPercent}%
-                    </span>
-                  </div>
-                  <div
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={quota.usedPercent}
-                    aria-label={isFa ? 'درصد مصرف حجم اشتراک' : 'Subscription traffic quota used'}
-                    className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--asis-primary-soft)]"
-                  >
-                    <div
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        quota.usedPercent >= 95
-                          ? 'bg-[#DC2626] dark:bg-[#F87171]'
-                          : quota.usedPercent >= 80
-                            ? 'bg-[#D97706] dark:bg-[#FBBF24]'
-                            : 'bg-[var(--asis-primary)]'
-                      }`}
-                      style={{ width: `${quota.usedPercent}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
-
-        <Card className="hidden space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-[var(--asis-accent-fg)] shrink-0" aria-hidden="true" />
-              <h3 className="text-sm font-semibold">
-                {isFa ? 'آمار موتور محلی کلاینت' : 'Local Engine Statistics (Non-Billing)'}
-              </h3>
-            </div>
-            <span className="font-mono text-xs text-[var(--asis-text-secondary)] whitespace-nowrap shrink-0">
-              source: {engineStats.source}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 text-xs">
-            <div>
-              <p className="text-[var(--asis-text-secondary)]">{isFa ? 'دانلود نشست' : 'Session Down'}</p>
-              <p className="mt-1 font-mono text-sm font-semibold">
-                {formatBytesCompact(engineStats.sessionDownloadBytes, '0 B')}
-              </p>
-            </div>
-            <div>
-              <p className="text-[var(--asis-text-secondary)]">{isFa ? 'آپلود نشست' : 'Session Up'}</p>
-              <p className="mt-1 font-mono text-sm font-semibold">
-                {formatBytesCompact(engineStats.sessionUploadBytes, '0 B')}
-              </p>
-            </div>
-            <div>
-              <p className="text-[var(--asis-text-secondary)]">{isFa ? 'کل نشست' : 'Session Total'}</p>
-              <p className="mt-1 font-mono text-sm font-semibold">
-                {formatBytesCompact(
-                  engineStats.sessionDownloadBytes + engineStats.sessionUploadBytes,
-                  '0 B',
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-[var(--asis-border)] pt-3 text-xs text-[var(--asis-text-secondary)]">
-            <span>{isFa ? 'شمارنده محلی فقط برای پایش تونل دستگاه است' : 'Client-side tunnel counters only'}</span>
-            <span className="font-mono">
-              {engineStats.sessionDurationSec > 0
-                ? `${Math.floor(engineStats.sessionDurationSec / 60)}m ${engineStats.sessionDurationSec % 60}s`
-                : isFa
-                  ? 'بدون نشست فعال'
-                  : 'Idle'}
-            </span>
-          </div>
-        </Card>
-      </div>
-
       {/* Visual Traffic Usage History (Recharts) */}
       <Card className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--asis-border)] pb-4">
@@ -450,8 +318,8 @@ export function StatisticsView({
         ) : normalizedChart.series.length > 0 ? (
           <div className="space-y-4">
             {/* Series Summary Cards: download / upload / total */}
-            <div className="grid grid-cols-3 gap-2" data-testid="stats-summary-cards">
-              <div className="rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)]/60 p-3 text-center">
+            <div className="grid grid-cols-2 gap-2" data-testid="stats-summary-cards">
+              <div className="asis-glass rounded-3xl p-3 text-center">
                 <ArrowDownToLine className="mx-auto h-4 w-4 text-[var(--asis-chart-primary)]" aria-hidden="true" />
                 <p className="mt-1 text-[11px] text-[var(--asis-text-secondary)]">
                   {isFa ? 'دانلود' : 'Download'}
@@ -460,7 +328,7 @@ export function StatisticsView({
                   {formatBytesCompact(normalizedChart.totalDownloadBytes, '0 B')}
                 </p>
               </div>
-              <div className="rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)]/60 p-3 text-center">
+              <div className="asis-glass rounded-3xl p-3 text-center">
                 <ArrowUpFromLine className="mx-auto h-4 w-4 text-[var(--asis-chart-secondary)]" aria-hidden="true" />
                 <p className="mt-1 text-[11px] text-[var(--asis-text-secondary)]">
                   {isFa ? 'آپلود' : 'Upload'}
@@ -469,15 +337,19 @@ export function StatisticsView({
                   {formatBytesCompact(normalizedChart.totalUploadBytes, '0 B')}
                 </p>
               </div>
-              <div className="rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)]/60 p-3 text-center">
-                <span className="block h-4 text-xs font-bold leading-4 text-[var(--asis-text-primary)]" aria-hidden="true">Σ</span>
-                <p className="mt-1 text-[11px] text-[var(--asis-text-secondary)]">
-                  {isFa ? 'مصرف کل' : 'Total'}
-                </p>
-                <p className="mt-0.5 font-mono text-sm font-semibold text-[var(--asis-text-primary)]" dir="ltr">
-                  {formatBytesCompact(normalizedChart.totalBytes, '0 B')}
-                </p>
-              </div>
+            </div>
+
+            {/* Big total-usage card (design: "مصرف کل" under the download/upload pair) */}
+            <div
+              className="asis-glass rounded-3xl p-4 text-center"
+              data-testid="stats-total-card"
+            >
+              <p className="text-xs text-[var(--asis-text-secondary)]">
+                {isFa ? 'مصرف کل' : 'Total usage'}
+              </p>
+              <p className="mt-1 font-mono text-2xl font-bold text-[var(--asis-text-primary)]" dir="ltr">
+                {formatBytesCompact(normalizedChart.totalBytes, '0 B')}
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -651,6 +523,147 @@ export function StatisticsView({
         )}
       </Card>
 
+      {/* Technical details: server usage vs local counters. Collapsed, most people do not need it. */}
+      <details className="asis-details asis-glass group rounded-3xl">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-medium transition-colors duration-150 hover:bg-[var(--asis-primary-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--asis-primary)] [&::-webkit-details-marker]:hidden">
+          <span>{isFa ? 'جزئیات فنی مصرف' : 'Technical usage details'}</span>
+          <span aria-hidden="true" className="text-xs text-[var(--asis-text-secondary)] transition-transform duration-200 group-open:rotate-180">▾</span>
+        </summary>
+        <div className="asis-view-enter p-3 md:p-4">
+      {/* Authoritative Server-Side Usage vs Local Engine Counters */}
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold">
+              {isFa ? 'مصرف رسمی اشتراک (سمت سرور)' : 'Authoritative Subscription Usage (Server)'}
+            </h3>
+            <span
+              className={`font-mono text-xs whitespace-nowrap shrink-0 ${
+                serverUsage || activeSubscription?.source === 'account'
+                  ? 'text-[#2BB673] dark:text-[#3BC48A]'
+                  : 'text-[#B7791F] dark:text-[#E0A030]'
+              }`}
+            >
+              {serverUsage || activeSubscription?.source === 'account'
+                ? 'Server Authoritative'
+                : 'NOT CONNECTED'}
+            </span>
+          </div>
+
+          {usageError && <StatusBanner tone="warning" title={usageError} />}
+
+          {loadingUsage ? (
+            <UsageMetricsSkeleton />
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4 text-xs">
+                <div>
+                  <p className="text-[var(--asis-text-secondary)]">{isFa ? 'کل حجم' : 'Total'}</p>
+                  <p className="mt-1 font-mono text-sm font-semibold">
+                    {formatBytesCompact(quota.totalBytes, unavailable)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[var(--asis-text-secondary)]">{isFa ? 'مصرف‌شده' : 'Used'}</p>
+                  <p className="mt-1 font-mono text-sm font-semibold">
+                    {formatBytesCompact(quota.usedBytes, unavailable)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[var(--asis-text-secondary)]">{isFa ? 'باقیمانده' : 'Remaining'}</p>
+                  <p className="mt-1 font-mono text-sm font-semibold">
+                    {formatBytesCompact(quota.remainingBytes, unavailable)}
+                  </p>
+                </div>
+              </div>
+
+              {quota.usedPercent !== null && (
+                <div className="space-y-1.5 border-t border-[var(--asis-border)] pt-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--asis-text-secondary)]">
+                      {isFa ? 'سهمیه مصرف‌شده' : 'Quota utilization'}
+                    </span>
+                    <span className="font-mono font-semibold text-[var(--asis-text-primary)]">
+                      {quota.usedPercent}%
+                    </span>
+                  </div>
+                  <div
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={quota.usedPercent}
+                    aria-label={isFa ? 'درصد مصرف حجم اشتراک' : 'Subscription traffic quota used'}
+                    className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--asis-primary-soft)]"
+                  >
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        quota.usedPercent >= 95
+                          ? 'bg-[#D64545] dark:bg-[#F07070]'
+                          : quota.usedPercent >= 80
+                            ? 'bg-[#B7791F] dark:bg-[#E0A030]'
+                            : 'bg-[var(--asis-primary)]'
+                      }`}
+                      style={{ width: `${quota.usedPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        <Card className="hidden space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[var(--asis-accent-fg)] shrink-0" aria-hidden="true" />
+              <h3 className="text-sm font-semibold">
+                {isFa ? 'آمار موتور محلی کلاینت' : 'Local Engine Statistics (Non-Billing)'}
+              </h3>
+            </div>
+            <span className="font-mono text-xs text-[var(--asis-text-secondary)] whitespace-nowrap shrink-0">
+              source: {engineStats.source}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 text-xs">
+            <div>
+              <p className="text-[var(--asis-text-secondary)]">{isFa ? 'دانلود نشست' : 'Session Down'}</p>
+              <p className="mt-1 font-mono text-sm font-semibold">
+                {formatBytesCompact(engineStats.sessionDownloadBytes, '0 B')}
+              </p>
+            </div>
+            <div>
+              <p className="text-[var(--asis-text-secondary)]">{isFa ? 'آپلود نشست' : 'Session Up'}</p>
+              <p className="mt-1 font-mono text-sm font-semibold">
+                {formatBytesCompact(engineStats.sessionUploadBytes, '0 B')}
+              </p>
+            </div>
+            <div>
+              <p className="text-[var(--asis-text-secondary)]">{isFa ? 'کل نشست' : 'Session Total'}</p>
+              <p className="mt-1 font-mono text-sm font-semibold">
+                {formatBytesCompact(
+                  engineStats.sessionDownloadBytes + engineStats.sessionUploadBytes,
+                  '0 B',
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-[var(--asis-border)] pt-3 text-xs text-[var(--asis-text-secondary)]">
+            <span>{isFa ? 'شمارنده محلی فقط برای پایش تونل دستگاه است' : 'Client-side tunnel counters only'}</span>
+            <span className="font-mono">
+              {engineStats.sessionDurationSec > 0
+                ? `${Math.floor(engineStats.sessionDurationSec / 60)}m ${engineStats.sessionDurationSec % 60}s`
+                : isFa
+                  ? 'بدون نشست فعال'
+                  : 'Idle'}
+            </span>
+          </div>
+        </Card>
+      </div>
+        </div>
+      </details>
+
       {/* Protocol Engine Support Matrix */}
       <Card padding="none" className="hidden overflow-x-auto md:block">
         <div className="border-b border-[var(--asis-border)] px-5 py-4">
@@ -676,7 +689,7 @@ export function StatisticsView({
                   <span
                     className={
                       row.engine === 'unsupported'
-                        ? 'text-[#DC2626] dark:text-[#F87171]'
+                        ? 'text-[#D64545] dark:text-[#F07070]'
                         : 'text-[var(--asis-accent-fg)]'
                     }
                   >

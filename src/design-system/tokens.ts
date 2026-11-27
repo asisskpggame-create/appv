@@ -40,6 +40,11 @@ export const ASIS_BRAND_TOKENS = {
       swatchLight: '#D97706',
       swatchDark: '#F59E0B',
     },
+    violet: {
+      id: 'violet',
+      swatchLight: '#7C3AED',
+      swatchDark: '#8B5CF6',
+    },
   },
   typography: {
     latinDisplay: 'Plus Jakarta Sans',
@@ -55,6 +60,6 @@ export const ASIS_BRAND_TOKENS = {
 
 export type ThemeMode = 'light' | 'dark';
 export type ThemePreference = 'light' | 'dark' | 'system';
-export type ThemePalette = 'azure' | 'emerald' | 'titanium';
+export type ThemePalette = 'azure' | 'emerald' | 'titanium' | 'violet';
 export type LocaleCode = 'en-US' | 'fa-IR';
 export type TextDirection = 'ltr' | 'rtl';

@@ -51,15 +51,15 @@ export function AccountView({
 
   return (
     <div className="mx-auto max-w-md space-y-5 text-start md:max-w-none md:space-y-8">
-      <Card elevated className="flex flex-wrap items-center justify-between gap-4">
+      <Card className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#3B98FF]/70 bg-[#071a3d]/60 text-[var(--asis-accent-fg)] shadow-[0_0_22px_-2px_rgba(29,134,255,0.6)]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
             <User className="w-6 h-6" aria-hidden="true" />
           </div>
           <div>
             <h2 className="text-lg font-semibold tracking-tight">{session.user.username}</h2>
             <p className="font-mono text-xs text-[var(--asis-text-secondary)] mt-0.5">
-              Status: <span className="text-[#16A34A] font-medium">{session.user.status}</span> · Device ID: {session.deviceId.slice(0, 12)}...
+              Status: <span className="text-[#2BB673] font-medium">{session.user.status}</span> · Device ID: {session.deviceId.slice(0, 12)}...
             </p>
           </div>
         </div>
@@ -108,7 +108,7 @@ export function AccountView({
                 onClick={r.onClick}
                 className="flex w-full items-center gap-3 px-4 py-4 text-start text-sm font-medium cursor-pointer"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--asis-surface-2)] text-[var(--asis-text-secondary)]">
                   <Icon className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <span className="flex-1">{r.label}</span>

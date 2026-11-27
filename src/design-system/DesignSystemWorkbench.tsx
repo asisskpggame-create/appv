@@ -421,19 +421,19 @@ export function DesignSystemWorkbench() {
                   <div className="divide-y divide-[#E2E8F0] rounded-lg border border-[#E2E8F0] dark:divide-[#1E293B] dark:border-[#1E293B]">
                     <div className="flex items-center justify-between px-4 py-3 text-sm">
                       <span className="font-medium">PasarGuard Adapter</span>
-                      <span className="font-mono text-xs text-[#D97706] dark:text-[#FBBF24]">
+                      <span className="font-mono text-xs text-[#B7791F] dark:text-[#E0A030]">
                         {t.statusNotConnected}
                       </span>
                     </div>
                     <div className="flex items-center justify-between px-4 py-3 text-sm">
                       <span className="font-medium">Reseller Adapter</span>
-                      <span className="font-mono text-xs text-[#D97706] dark:text-[#FBBF24]">
+                      <span className="font-mono text-xs text-[#B7791F] dark:text-[#E0A030]">
                         {t.statusNotConnected}
                       </span>
                     </div>
                     <div className="flex items-center justify-between px-4 py-3 text-sm">
                       <span className="font-medium">Design Tokens & RTL</span>
-                      <span className="font-mono text-xs text-[#16A34A] dark:text-[#4ADE80]">
+                      <span className="font-mono text-xs text-[#2BB673] dark:text-[#3BC48A]">
                         {t.statusCompleted}
                       </span>
                     </div>
@@ -499,7 +499,7 @@ export function DesignSystemWorkbench() {
             </Card>
 
             <Card className="space-y-2.5">
-              <div className="flex items-center gap-2 text-[#D97706] dark:text-[#FBBF24]">
+              <div className="flex items-center gap-2 text-[#B7791F] dark:text-[#E0A030]">
                 <Globe className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <h3 className="text-sm font-semibold text-[#0E1428] dark:text-[#F1F5F9]">
                   {t.integrationTitle}
@@ -534,7 +534,7 @@ export function DesignSystemWorkbench() {
                   <span
                     className={`font-mono text-xs ${
                       phase.done
-                        ? 'text-[#16A34A] dark:text-[#4ADE80]'
+                        ? 'text-[#2BB673] dark:text-[#3BC48A]'
                         : 'text-[#64748B] dark:text-[#94A3B8]'
                     }`}
                   >

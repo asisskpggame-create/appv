@@ -659,6 +659,7 @@ test('themeEngine dynamically toggles CSS variables across Azure, Emerald, and T
   assert.equal(normalizeThemePreference('unknown'), 'dark');
   assert.equal(normalizeThemePalette('emerald'), 'emerald');
   assert.equal(normalizeThemePalette('titanium'), 'titanium');
+  assert.equal(normalizeThemePalette('violet'), 'violet');
   assert.equal(normalizeThemePalette('invalid'), 'azure');
 
   const classes = new Set<string>();
@@ -710,6 +711,11 @@ test('themeEngine dynamically toggles CSS variables across Azure, Emerald, and T
   assert.notEqual(azureDark['--asis-primary'], emeraldDark['--asis-primary']);
   assert.notEqual(emeraldDark['--asis-primary'], titaniumDark['--asis-primary']);
   assert.notEqual(azureDark['--asis-chart-primary'], titaniumDark['--asis-chart-primary']);
+  const violetDark = resolveThemeCssVariables('dark', 'violet');
+  assert.equal(violetDark['--asis-primary'], '#8B5CF6');
+  for (const other of [azureDark, emeraldDark, titaniumDark]) {
+    assert.notEqual(violetDark['--asis-primary'], other['--asis-primary']);
+  }
 });
 
 test('isBlockedIp blocks private, reserved, and IPv4-mapped IPv6 targets but allows public IPs', () => {
