@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    tags: ['v*']
 
 permissions:
   contents: write
@@ -146,3 +147,28 @@ jobs:
         with:
           name: asis-vpn-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v${VERSION}"
+          fi
+          ENGINE=$([ -f android/app/libs/libbox.aar ] && echo "sing-box core" || echo "stub engine")
+          APK_SRC="android/app/build/outputs/apk/debug/app-debug.apk"
+          APK_OUT="android/app/build/outputs/apk/debug/asis-vpn-${TAG}-debug.apk"
+          cp "$APK_SRC" "$APK_OUT"
+          NOTES="Automated Android debug APK build from commit ${{ github.sha }} (engine: ${ENGINE})."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK_OUT" --clobber
+            gh release edit "$TAG" --title "ASiS VPN ${TAG}" --notes "$NOTES"
+          else
+            gh release create "$TAG" "$APK_OUT" \
+              --target "${{ github.sha }}" \
+              --title "ASiS VPN ${TAG}" \
+              --notes "$NOTES"
+          fi
