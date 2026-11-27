@@ -15,6 +15,6 @@
 
 ## 2. Client Local Storage Split
 
-- **Secure Storage (Keystore / Keychain / DPAPI)**: Access token (memory + refresh token in secure vault), device keypair.
+- **Secure Storage (Keystore / Keychain / DPAPI) - target, not implemented yet (the app uses WebView `localStorage` today)**: Access token (memory + refresh token in secure vault), device keypair.
 - **Local Database (SQLite / Room / SwiftData)**: Non-sensitive cached server catalog, favorites, recent servers, local session history, and `AppSettings` (theme, language, DNS preference, routing mode).
 - **Explicitly Excluded**: Raw PasarGuard panel credentials, unencrypted sensitive tokens, and raw unredacted subscription URLs in diagnostic logs.

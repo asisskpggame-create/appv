@@ -3,6 +3,7 @@ package com.asisvpn.client.vpn;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -10,6 +11,7 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.VpnService;
+import android.os.Build;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -33,6 +35,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -91,6 +95,7 @@ public class AsisVpnPlugin extends Plugin {
                 String state = VpnRuntime.getState();
                 if (VpnRuntime.CONNECTED.equals(state)) {
                     call.resolve();
+                    askNotificationPermissionOnce();
                     return;
                 }
                 if (VpnRuntime.ERROR.equals(state)) {
@@ -113,6 +118,37 @@ public class AsisVpnPlugin extends Plugin {
             sendStop();
             call.reject("The tunnel did not come up in time.", "ENGINE_CONNECT_TIMEOUT");
         }, "asis-vpn-connect").start();
+    }
+
+    private static final String PREFS = "asis_vpn_prefs";
+    private static final String PREF_NOTIF_ASKED = "notification_permission_asked";
+    private static final String NOTIF_PERMISSION = "android.permission.POST_NOTIFICATIONS";
+
+    /**
+     * Android 13+ hides the foreground-service notification until POST_NOTIFICATIONS is granted. Ask once,
+     * only AFTER the tunnel is up (so it never stacks on the VPN consent dialog), and never block or fail
+     * the connect: the answer is not needed, and a refusal only hides the notification. Asked a single time
+     * per install, so a "no" is not nagged about.
+     */
+    private void askNotificationPermissionOnce() {
+        try {
+            if (Build.VERSION.SDK_INT < 33) return;
+            final Activity activity = getActivity();
+            if (activity == null) return;
+            if (activity.checkSelfPermission(NOTIF_PERMISSION) == PackageManager.PERMISSION_GRANTED) return;
+            final SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            if (prefs.getBoolean(PREF_NOTIF_ASKED, false)) return;
+            prefs.edit().putBoolean(PREF_NOTIF_ASKED, true).apply();
+            activity.runOnUiThread(() -> {
+                try {
+                    activity.requestPermissions(new String[] {NOTIF_PERMISSION}, 7102);
+                } catch (RuntimeException ignored) {
+                    // Not worth failing anything over.
+                }
+            });
+        } catch (RuntimeException ignored) {
+            // Same: best effort only.
+        }
     }
 
     private void sendStop() {
@@ -207,7 +243,7 @@ public class AsisVpnPlugin extends Plugin {
             int n;
             while ((n = s.getInputStream().read(chunk)) != -1) {
                 buf.write(chunk, 0, n);
-                if (buf.size() > 262144) return null;
+                if (buf.size() > 1048576) return null;
             }
             String resp = buf.toString("UTF-8");
             int headerEnd = resp.indexOf("\r\n\r\n");
@@ -229,7 +265,46 @@ public class AsisVpnPlugin extends Plugin {
         return d > 0 ? (Object) d : JSONObject.NULL;
     }
 
+    /** Whole-call limit for the one-by-one fallback below, so a hung controller cannot add up to minutes. */
+    private static final long STATUS_FALLBACK_MS = 6000;
+
+    /**
+     * Reads the tunnel status with ONE controller request (GET /proxies returns every outbound with its
+     * delay history). If that answer is missing or has no "proxy" group (older/odd controller), it falls
+     * back to asking one outbound at a time, but with a total time limit.
+     */
     private static JSObject readTunnelStatus() {
+        JSONObject everything = controllerGet("/proxies", 3000);
+        JSONObject map = everything == null ? null : everything.optJSONObject("proxies");
+        JSONObject group = map == null ? null : map.optJSONObject("proxy");
+        if (group != null) {
+            return statusFrom(group, map);
+        }
+        return readTunnelStatusOneByOne();
+    }
+
+    /** Builds the status object from the "proxy" group; {@code map} (tag -> proxy) may be null. */
+    private static JSObject statusFrom(JSONObject group, JSONObject map) {
+        JSObject ret = new JSObject();
+        JSObject delays = new JSObject();
+        ret.put("delays", delays);
+        ret.put("available", true);
+        JSONArray all = group.optJSONArray("all");
+        if (all != null) {
+            ret.put("active", group.optString("now", ""));
+            for (int i = 0; i < all.length(); i++) {
+                String tag = all.optString(i, "");
+                if (!tag.matches("^[A-Za-z0-9_-]{1,64}$")) continue;
+                delays.put(tag, lastDelay(map == null ? null : map.optJSONObject(tag)));
+            }
+        } else {
+            ret.put("active", "proxy");
+            delays.put("proxy", lastDelay(group));
+        }
+        return ret;
+    }
+
+    private static JSObject readTunnelStatusOneByOne() {
         JSObject ret = new JSObject();
         JSObject delays = new JSObject();
         ret.put("delays", delays);
@@ -239,18 +314,19 @@ public class AsisVpnPlugin extends Plugin {
             ret.put("active", JSONObject.NULL);
             return ret;
         }
-        ret.put("available", true);
         JSONArray all = group.optJSONArray("all");
-        if (all != null) {
-            ret.put("active", group.optString("now", ""));
-            for (int i = 0; i < all.length(); i++) {
-                String tag = all.optString(i, "");
-                if (!tag.matches("^[A-Za-z0-9_-]{1,64}$")) continue;
-                delays.put(tag, lastDelay(controllerGet("/proxies/" + tag, 3000)));
+        if (all == null) return statusFrom(group, null);
+        ret.put("available", true);
+        ret.put("active", group.optString("now", ""));
+        final long deadline = System.currentTimeMillis() + STATUS_FALLBACK_MS;
+        for (int i = 0; i < all.length(); i++) {
+            String tag = all.optString(i, "");
+            if (!tag.matches("^[A-Za-z0-9_-]{1,64}$")) continue;
+            if (System.currentTimeMillis() >= deadline) {
+                delays.put(tag, JSONObject.NULL); // not asked in time: unknown, not a failure
+                continue;
             }
-        } else {
-            ret.put("active", "proxy");
-            delays.put("proxy", lastDelay(group));
+            delays.put(tag, lastDelay(controllerGet("/proxies/" + tag, 3000)));
         }
         return ret;
     }
@@ -281,6 +357,8 @@ public class AsisVpnPlugin extends Plugin {
 
     private static final Pattern PROBE_HOST = Pattern.compile("^[A-Za-z0-9.:\\-]{1,253}$");
     private static final int PROBE_MAX_TARGETS = 100;
+    /** Hard limit for the whole tcpProbe call, however many targets or slow DNS lookups there are. */
+    private static final long PROBE_OVERALL_MS = 20000;
 
     /**
      * TCP handshake time from this phone to each host:port. Sockets are bound to the
@@ -302,16 +380,31 @@ public class AsisVpnPlugin extends Plugin {
                 final Network net = physicalNetwork(ctx);
                 int count = Math.min(targets.length(), PROBE_MAX_TARGETS);
                 List<Future<JSObject>> futures = new ArrayList<>();
+                List<String> ids = new ArrayList<>();
                 for (int i = 0; i < count; i++) {
                     JSONObject t = targets.optJSONObject(i);
                     final String id = t == null ? "" : t.optString("id", "");
                     final String host = t == null ? "" : t.optString("host", "");
                     final int port = t == null ? 0 : t.optInt("port", 0);
+                    ids.add(id);
                     futures.add(pool.submit(() -> probeOne(net, id, host, port, timeoutMs)));
                 }
+                final long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(PROBE_OVERALL_MS);
                 JSArray results = new JSArray();
-                for (Future<JSObject> f : futures) {
-                    results.put(f.get());
+                for (int i = 0; i < futures.size(); i++) {
+                    Future<JSObject> f = futures.get(i);
+                    long left = Math.max(0L, deadline - System.nanoTime());
+                    try {
+                        results.put(f.get(left, TimeUnit.NANOSECONDS));
+                    } catch (TimeoutException te) {
+                        f.cancel(true);
+                        JSObject r = new JSObject();
+                        r.put("id", ids.get(i));
+                        r.put("available", false);
+                        r.put("latencyMs", JSObject.NULL);
+                        r.put("error", "timeout");
+                        results.put(r);
+                    }
                 }
                 JSObject ret = new JSObject();
                 ret.put("results", results);

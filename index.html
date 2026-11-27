@@ -10,20 +10,14 @@
     <meta property="og:description" content="ASiS VPN — Commercial multi-platform VPN client, gateway architecture, and bilingual RTL/LTR design system." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Vazirmatn:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
     <script>
       (function () {
         try {
-          var pref = localStorage.getItem('asis_theme_pref_v1') || 'dark';
+          var pref = 'dark';
           var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
           var resolved = pref === 'dark' || (pref === 'system' && prefersDark) ? 'dark' : 'light';
           if (resolved === 'dark') document.documentElement.classList.add('dark');
-          var palette = localStorage.getItem('asis_palette_v1') || 'azure';
+          var palette = 'azure';
           if (palette === 'azure' || palette === 'emerald' || palette === 'titanium') {
             document.documentElement.setAttribute('data-palette', palette);
           }
@@ -46,27 +40,18 @@
       }
       html:not(.dark) #boot-splash { background: #F3F6FB; }
       #boot-splash.hide { opacity: 0; visibility: hidden; }
-      #boot-splash svg {
-        width: 88px; height: 88px;
+      #boot-splash img {
+        width: 132px; height: 132px; border-radius: 50%;
         filter: drop-shadow(0 0 18px rgba(29, 134, 255, 0.8));
         animation: boot-pulse 1.6s ease-in-out infinite;
       }
       @keyframes boot-pulse { 0%, 100% { transform: scale(0.97); } 50% { transform: scale(1.04); } }
-      @media (prefers-reduced-motion: reduce) { #boot-splash svg { animation: none; } }
+      @media (prefers-reduced-motion: reduce) { #boot-splash img { animation: none; } }
     </style>
   </head>
   <body class="bg-[var(--asis-bg)] text-[var(--asis-text-primary)] antialiased selection:bg-[var(--asis-primary)]/20 selection:text-[var(--asis-accent-fg)]">
     <div id="boot-splash" aria-hidden="true">
-      <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="boot-g" x1="6" y1="3" x2="30" y2="33" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#3B98FF" />
-            <stop offset="100%" stop-color="#0F6FE0" />
-          </linearGradient>
-        </defs>
-        <path d="M18 2.5L5 7.8V16.9C5 24.7 10.6 31.6 18 33.5C25.4 31.6 31 24.7 31 16.9V7.8L18 2.5Z" fill="url(#boot-g)" />
-        <path d="M18 9.2L11.6 24.8H14.8L16.1 21.3H19.9L21.2 24.8H24.4L18 9.2ZM17 18.7L18 15.8L19 18.7H17Z" fill="#FFFFFF" />
-      </svg>
+      <img src="/assets/asis-logo.png" alt="" />
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

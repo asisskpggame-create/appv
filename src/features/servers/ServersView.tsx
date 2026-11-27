@@ -324,9 +324,37 @@ export function ServersView({
   };
 
   return (
-    <div className="space-y-8 text-start">
+    <div className="space-y-5 text-start md:space-y-8">
+      {/* Mobile toolbar: compact icon actions (the full header is desktop-only) */}
+      <div className="flex items-center justify-between gap-2 md:hidden">
+        <p className="text-xs text-[var(--asis-text-secondary)]">
+          {filteredServers.length} {isFa ? 'سرور' : 'servers'}
+        </p>
+        <div className="flex items-center gap-2">
+          {onProbeServers && (
+            <button
+              type="button"
+              aria-label={t.testPingBtn}
+              disabled={probingIds.size > 0 || filteredServers.every((s) => !s.supported || !s.probeHost || !s.port)}
+              onClick={() => onProbeServers(filteredServers.filter((s) => s.supported && s.probeHost && s.port))}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--asis-border-strong)] bg-[var(--asis-surface)] text-[var(--asis-accent-fg)] disabled:opacity-50"
+            >
+              <Activity className={`h-4 w-4 ${probingIds.size > 0 ? 'animate-pulse' : ''}`} aria-hidden="true" />
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label={t.refreshBtn}
+            onClick={() => void handleRefreshCatalog()}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--asis-border-strong)] bg-[var(--asis-surface)] text-[var(--asis-accent-fg)]"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--asis-border)] pb-5">
+      <div className="hidden flex-wrap items-end justify-between gap-4 border-b border-[var(--asis-border)] pb-5 md:flex">
         <div className="flex items-center gap-3.5">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
             <MapPin className="w-5 h-5" aria-hidden="true" />
@@ -379,14 +407,16 @@ export function ServersView({
         </div>
       </div>
 
-      <StatusBanner
-        tone="info"
-        title={t.icmpVsTunnelTitle}
-        description={gatewayNotice ?? t.icmpVsTunnelBody}
-      />
+      <div className="hidden md:block">
+        <StatusBanner
+          tone="info"
+          title={t.icmpVsTunnelTitle}
+          description={gatewayNotice ?? t.icmpVsTunnelBody}
+        />
+      </div>
 
       {/* Smart Connection Policy */}
-      <Card className="space-y-4">
+      <Card className="hidden space-y-4 md:block">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-[var(--asis-accent-fg)]" aria-hidden="true" />
@@ -494,7 +524,7 @@ export function ServersView({
             />
           </div>
 
-          <Card className="grid grid-cols-1 gap-4 md:grid-cols-12 items-end">
+          <Card className="grid grid-cols-1 gap-4 !p-3 md:!p-6 md:grid-cols-12 items-end">
             <div className="md:col-span-4">
               <Input
                 label={t.colServer}
@@ -504,7 +534,7 @@ export function ServersView({
               />
             </div>
 
-            <div className="md:col-span-3 flex flex-col gap-1.5">
+            <div className="hidden md:col-span-3 md:flex flex-col gap-1.5">
               <label className="text-sm font-medium">{t.colCountry}</label>
               <select
                 value={countryFilter}
@@ -520,7 +550,7 @@ export function ServersView({
               </select>
             </div>
 
-            <div className="md:col-span-2 flex flex-col gap-1.5">
+            <div className="hidden md:col-span-2 md:flex flex-col gap-1.5">
               <label className="text-sm font-medium">{t.colProtocol}</label>
               <select
                 value={protocolFilter}
@@ -536,7 +566,7 @@ export function ServersView({
               </select>
             </div>
 
-            <div className="md:col-span-3 flex flex-wrap items-center gap-2">
+            <div className="hidden md:col-span-3 md:flex flex-wrap items-center gap-2">
               <select
                 aria-label={t.sortLabel}
                 value={sortMode}
@@ -635,7 +665,7 @@ export function ServersView({
               <Button
                 variant="primary"
                 size="lg"
-                className="w-full"
+                className="w-full !min-h-[54px] !rounded-2xl !text-base !font-bold shadow-[0_10px_30px_-8px_rgba(29,134,255,0.8)]"
                 disabled={!pendingServerId || !filteredServers.some((s) => s.id === pendingServerId && s.supported)}
                 onClick={() => {
                   const target = allServers.find((s) => s.id === pendingServerId);

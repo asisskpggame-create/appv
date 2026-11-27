@@ -1,7 +1,7 @@
 {
   "name": "asis-vpn",
   "private": true,
-  "version": "0.4.12",
+  "version": "0.4.28",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -10,9 +10,11 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "node --test tests/runTests.ts tests/engineTests.ts tests/resellerTests.ts tests/accountTests.ts tests/gatewayHttpTests.ts tests/gatewayFlowTests.ts tests/authClientLockTests.ts tests/resellerReceiverTests.ts tests/resellerPythonReceiverTests.ts tests/lazyScreensTests.ts"
+    "check": "bash scripts/check.sh",
+    "test": "node --test tests/runTests.ts tests/engineTests.ts tests/resellerTests.ts tests/accountTests.ts tests/gatewayHttpTests.ts tests/gatewayFlowTests.ts tests/authClientLockTests.ts tests/resellerReceiverTests.ts tests/resellerPythonReceiverTests.ts tests/lazyScreensTests.ts tests/sessionSecureStoreTests.ts tests/shellSessionRestoreTests.ts tests/connectGuardTests.ts tests/probeLimitTests.ts tests/foregroundServiceTests.ts tests/tunnelStatusTests.ts tests/designGapTests.ts"
   },
   "dependencies": {
+    "@fontsource/vazirmatn": "^5.2.5",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "dotenv": "^17.2.3",

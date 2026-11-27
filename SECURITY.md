@@ -7,7 +7,7 @@
 3. **Token Lifecycle**:
    - Short-lived access tokens (`10–15 min` TTL).
    - Rotating refresh tokens with reuse detection (revokes token family on replay).
-   - Native secure storage: Android Keystore + EncryptedSharedPreferences, iOS Keychain, Windows DPAPI / Credential Manager.
+   - Native secure storage (TARGET, not done yet): Android Keystore + EncryptedSharedPreferences, iOS Keychain, Windows DPAPI / Credential Manager. **Today the installed app keeps the session in the WebView's `localStorage`** (`sessionStore.ts`); see CHANGELOG 0.4.17.
    - Web gateway preview: `Authorization: Bearer` in memory only (never `localStorage`).
 4. **Configuration Injection Prevention**:
    - Every parsed VLESS/VMess/Trojan/WireGuard/Hysteria2/TUIC config undergoes strict schema validation before passing to `sing-box` JSON generation.

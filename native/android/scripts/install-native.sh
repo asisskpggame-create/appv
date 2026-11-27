@@ -18,6 +18,10 @@ cp "$SRC/src/com/asisvpn/client/MainActivity.java" "$PKG/MainActivity.java"
 cp "$SRC"/src/com/asisvpn/client/vpn/*.java "$PKG/vpn/"
 cp "$SRC/$VARIANT"/com/asisvpn/client/vpn/*.java "$PKG/vpn/"
 
+# Notification icon (white on transparent, one PNG per density)
+mkdir -p android/app/src/main/res
+cp -r "$SRC/res/." android/app/src/main/res/
+
 if [ "$VARIANT" = "engine-stub" ]; then
   rm -f android/app/libs/libbox.aar
   python3 "$SRC/scripts/patch_android.py" --stub

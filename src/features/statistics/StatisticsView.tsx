@@ -231,10 +231,10 @@ export function StatisticsView({
   const uploadGradId = `asis-ul-${gradientIdPrefix}`;
 
   return (
-    <div className="space-y-8 text-start">
+    <div className="space-y-5 text-start md:space-y-8">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--asis-border)] pb-5">
-        <div>
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--asis-border)] pb-5 max-md:border-0 max-md:pb-0">
+        <div className="hidden md:block">
           <h2 className="text-xl font-semibold tracking-tight">
             {isFa ? 'آمار مصرف و پشتیبانی پروتکل‌ها' : 'Traffic Statistics & Engine Compatibility'}
           </h2>
@@ -248,6 +248,7 @@ export function StatisticsView({
         <Button
           variant="outline"
           size="sm"
+          className="max-md:w-full"
           loading={loadingUsage}
           icon={<RefreshCw className="w-4 h-4" aria-hidden="true" />}
           onClick={() => void fetchAuthoritativeUsage(granularity)}
@@ -257,7 +258,7 @@ export function StatisticsView({
       </div>
 
       {/* Authoritative Server-Side Usage vs Local Engine Counters */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
         <Card className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold">
@@ -338,7 +339,7 @@ export function StatisticsView({
           )}
         </Card>
 
-        <Card className="space-y-4">
+        <Card className="hidden space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-[var(--asis-accent-fg)] shrink-0" aria-hidden="true" />
@@ -407,6 +408,7 @@ export function StatisticsView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <div className="hidden">
             <SegmentedControl<TrafficChartSource>
               ariaLabel={isFa ? 'منبع نمودار ترافیک' : 'Traffic chart source'}
               value={chartSource}
@@ -416,6 +418,7 @@ export function StatisticsView({
                 { value: 'local_engine', label: isFa ? 'موتور محلی' : 'Local' },
               ]}
             />
+            </div>
 
             <SegmentedControl<TrafficGranularity>
               ariaLabel={isFa ? 'بازه زمانی تاریخچه ترافیک' : 'Traffic history timeframe'}
@@ -428,6 +431,7 @@ export function StatisticsView({
               ]}
             />
 
+            <div className="hidden">
             <SegmentedControl<TrafficChartMode>
               ariaLabel={isFa ? 'نوع نمودار' : 'Chart display style'}
               value={chartMode}
@@ -437,6 +441,7 @@ export function StatisticsView({
                 { value: 'bar', label: isFa ? 'ستونی' : 'Bar' },
               ]}
             />
+            </div>
           </div>
         </div>
 
@@ -444,39 +449,44 @@ export function StatisticsView({
           <TrafficChartSkeleton />
         ) : normalizedChart.series.length > 0 ? (
           <div className="space-y-4">
-            {/* Series Summary Row */}
-            <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
-              <div className="flex flex-wrap items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <ArrowDownToLine className="h-3.5 w-3.5 text-[var(--asis-chart-primary)]" aria-hidden="true" />
-                  <span className="text-[var(--asis-text-secondary)]">
-                    {isFa ? 'کل دانلود:' : 'Download:'}
-                  </span>
-                  <span className="font-mono font-semibold text-[var(--asis-text-primary)]">
-                    {formatBytesCompact(normalizedChart.totalDownloadBytes, '0 B')}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <ArrowUpFromLine className="h-3.5 w-3.5 text-[var(--asis-chart-secondary)]" aria-hidden="true" />
-                  <span className="text-[var(--asis-text-secondary)]">
-                    {isFa ? 'کل آپلود:' : 'Upload:'}
-                  </span>
-                  <span className="font-mono font-semibold text-[var(--asis-text-primary)]">
-                    {formatBytesCompact(normalizedChart.totalUploadBytes, '0 B')}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[var(--asis-text-secondary)]">
-                    {isFa ? 'اوج بازه:' : 'Peak:'}
-                  </span>
-                  <span className="font-mono font-semibold text-[var(--asis-text-primary)]">
-                    {formatBytesCompact(normalizedChart.peakBucketBytes, '0 B')}
-                  </span>
-                </div>
+            {/* Series Summary Cards: download / upload / total */}
+            <div className="grid grid-cols-3 gap-2" data-testid="stats-summary-cards">
+              <div className="rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)]/60 p-3 text-center">
+                <ArrowDownToLine className="mx-auto h-4 w-4 text-[var(--asis-chart-primary)]" aria-hidden="true" />
+                <p className="mt-1 text-[11px] text-[var(--asis-text-secondary)]">
+                  {isFa ? 'دانلود' : 'Download'}
+                </p>
+                <p className="mt-0.5 font-mono text-sm font-semibold text-[var(--asis-text-primary)]" dir="ltr">
+                  {formatBytesCompact(normalizedChart.totalDownloadBytes, '0 B')}
+                </p>
               </div>
+              <div className="rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)]/60 p-3 text-center">
+                <ArrowUpFromLine className="mx-auto h-4 w-4 text-[var(--asis-chart-secondary)]" aria-hidden="true" />
+                <p className="mt-1 text-[11px] text-[var(--asis-text-secondary)]">
+                  {isFa ? 'آپلود' : 'Upload'}
+                </p>
+                <p className="mt-0.5 font-mono text-sm font-semibold text-[var(--asis-text-primary)]" dir="ltr">
+                  {formatBytesCompact(normalizedChart.totalUploadBytes, '0 B')}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)]/60 p-3 text-center">
+                <span className="block h-4 text-xs font-bold leading-4 text-[var(--asis-text-primary)]" aria-hidden="true">Σ</span>
+                <p className="mt-1 text-[11px] text-[var(--asis-text-secondary)]">
+                  {isFa ? 'مصرف کل' : 'Total'}
+                </p>
+                <p className="mt-0.5 font-mono text-sm font-semibold text-[var(--asis-text-primary)]" dir="ltr">
+                  {formatBytesCompact(normalizedChart.totalBytes, '0 B')}
+                </p>
+              </div>
+            </div>
 
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-[var(--asis-text-secondary)]">
+                {isFa ? 'اوج بازه:' : 'Peak:'}{' '}
+                <span className="font-mono font-semibold text-[var(--asis-text-primary)]" dir="ltr">
+                  {formatBytesCompact(normalizedChart.peakBucketBytes, '0 B')}
+                </span>
+              </span>
               <span className="font-mono text-[11px] text-[var(--asis-text-secondary)]">
                 {isFa ? `واحد محور: ${normalizedChart.unit}` : `Unit: ${normalizedChart.unit}`}
               </span>
@@ -642,7 +652,7 @@ export function StatisticsView({
       </Card>
 
       {/* Protocol Engine Support Matrix */}
-      <Card padding="none" className="overflow-x-auto">
+      <Card padding="none" className="hidden overflow-x-auto md:block">
         <div className="border-b border-[var(--asis-border)] px-5 py-4">
           <h3 className="text-sm font-semibold">
             {isFa ? 'ماتریس پشتیبانی پروتکل‌ها و موتور VPN' : 'VPN Engine Protocol Support Matrix'}

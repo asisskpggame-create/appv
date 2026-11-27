@@ -23,6 +23,8 @@
 - `tests/accountTests.ts`: password hashing, 3-strike lock, unlock, parallel guesses (in-memory and SQLite).
 - Gap: router wiring of the login paths and `/admin/*` have no HTTP-level test yet.
 
+- One command for the baseline: `npm run check` (runs `scripts/check.sh`: install if needed, `tsc --noEmit`, `npm test`, `vite build`; stops at the first failure).
+
 ## 2. Mandatory Manual QA Scenarios
 
 - [ ] Login success, invalid credentials, suspended account, offline error

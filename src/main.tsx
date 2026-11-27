@@ -1,3 +1,6 @@
+import '@fontsource/vazirmatn/400.css';
+import '@fontsource/vazirmatn/500.css';
+import '@fontsource/vazirmatn/700.css';
 import './apiBase.ts';
 import { installNativeBridge } from './engine/nativeBridge.ts';
 import {createRoot} from 'react-dom/client';

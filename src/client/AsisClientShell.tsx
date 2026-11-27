@@ -19,7 +19,16 @@ import {
   AsisVpnEngineAdapter,
   type AdvancedConnectionPolicy,
 } from '../engine';
-import type { AuthSession } from '../features/auth';
+import {
+  AsisLoginScreen,
+  HttpAuthClient,
+  getSecureStore,
+  isAccessTokenExpiringSoon,
+  loadPersistedSession,
+  loadSessionSecure,
+  persistSessionSecure,
+  type AuthSession,
+} from '../features/auth';
 import { HomeView } from '../features/home/HomeView';
 import {
   ServersView,
@@ -159,7 +168,63 @@ export function AsisClientShell() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
-  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+  // With a system secure store (plugin installed) the saved session loads asynchronously, so we
+  // start signed-out + "restoring" and wait; without it the old synchronous load is used.
+  const [sessionRestoring, setSessionRestoring] = useState<boolean>(() => getSecureStore() !== null);
+  const [authSession, setAuthSession] = useState<AuthSession | null>(() =>
+    getSecureStore() ? null : loadPersistedSession(),
+  );
+  // Without an account the person can still add subscription links by hand ("guest").
+  const [guestMode, setGuestMode] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  // Installed app: load the saved session from the secure store (only when one exists).
+  useEffect(() => {
+    if (!sessionRestoring) return;
+    let cancelled = false;
+    void loadSessionSecure()
+      .then((saved) => {
+        if (!cancelled && saved) setAuthSession((prev) => prev ?? saved);
+      })
+      .catch(() => undefined)
+      .then(() => {
+        if (!cancelled) setSessionRestoring(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Runs once on launch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Installed app: keep the session across launches (browser preview never persists tokens).
+  // Never save while restoring: the empty initial state would wipe the stored session.
+  useEffect(() => {
+    if (sessionRestoring) return;
+    void persistSessionSecure(authSession);
+  }, [authSession, sessionRestoring]);
+
+  // On launch (after the saved session is loaded), renew an expired access token; if renewal
+  // fails, send the person back to sign-in.
+  useEffect(() => {
+    if (sessionRestoring) return;
+    if (!authSession || !isAccessTokenExpiringSoon(authSession)) return;
+    let cancelled = false;
+    void new HttpAuthClient('/api/v1')
+      .refresh(authSession.tokens.refreshToken, authSession.deviceId)
+      .then((tokens) => {
+        if (!cancelled) setAuthSession((prev) => (prev ? { ...prev, tokens } : prev));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSessionExpired(true);
+        setAuthSession(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionRestoring]);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
 
   // Account subscriptions (and their servers) load automatically after sign-in
@@ -401,7 +466,6 @@ export function AsisClientShell() {
     { id: 'account', labelEn: 'Account', labelFa: 'حساب کاربری', icon: User },
     { id: 'settings', labelEn: 'Settings', labelFa: 'تنظیمات', icon: Settings },
     { id: 'support', labelEn: 'Support', labelFa: 'پشتیبانی', icon: LifeBuoy },
-    { id: 'gateway', labelEn: 'API Gateway', labelFa: 'درگاه API', icon: Globe },
   ];
 
   const allNav = [...primaryNav, ...secondaryNav];
@@ -429,6 +493,29 @@ export function AsisClientShell() {
       </button>
     );
   };
+
+  if (sessionRestoring) {
+    // Short blank screen while the saved session loads, so the sign-in form does not flash.
+    return <div className="min-h-screen" aria-busy="true" />;
+  }
+
+  if (!authSession && !guestMode) {
+    return (
+      <AsisLoginScreen
+        initialSessionExpired={sessionExpired}
+        onAuthenticated={(session) => {
+          setSessionExpired(false);
+          screenRef.current = 'home';
+          setScreenRaw('home');
+          setAuthSession(session);
+        }}
+        onContinueWithoutAccount={() => {
+          setGuestMode(true);
+          setScreen('subscriptions');
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-[var(--asis-bg)] text-[var(--asis-text-primary)] transition-colors duration-200">
@@ -502,7 +589,7 @@ export function AsisClientShell() {
       {/* Main Viewport */}
       <div className="asis-canvas-ambient flex flex-1 flex-col min-w-0 pb-24 md:pb-0">
         {/* Top Bar */}
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-[var(--asis-border)] bg-[var(--asis-chrome)]/85 px-6 py-3.5 backdrop-blur-md">
+        <header className="sticky top-0 z-30 hidden md:flex items-center justify-between gap-4 border-b border-[var(--asis-border)] bg-[var(--asis-chrome)]/85 px-6 py-3.5 backdrop-blur-md">
           <div className="flex items-center gap-3 min-w-0">
             <BrandLogo glow className="w-7 h-7 md:hidden shrink-0" />
             <div className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
@@ -525,8 +612,6 @@ export function AsisClientShell() {
               </Button>
             )}
 
-            <ThemePaletteSwitcher variant="popover" />
-
             <SegmentedControl<'en-US' | 'fa-IR'>
               ariaLabel="Language"
               value={locale}
@@ -539,7 +624,13 @@ export function AsisClientShell() {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-7 sm:px-8 sm:py-9">
+        {screen !== 'home' && (
+          <div className="flex items-center justify-center px-4 pb-1 pt-4 md:hidden">
+            <h1 className="text-lg font-bold tracking-tight">{isFa ? currentNav.labelFa : currentNav.labelEn}</h1>
+          </div>
+        )}
+
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-4 sm:px-8 sm:py-9 md:py-9">
           <div key={screen} className="asis-view-enter">
             {screen === 'home' && (
               <HomeView
@@ -603,8 +694,14 @@ export function AsisClientShell() {
               {screen === 'account' && (
                 <AccountView
                   session={authSession}
-                  onSessionChange={setAuthSession}
+                  onSessionChange={(next) => {
+                    if (!next) setGuestMode(false);
+                    setAuthSession(next);
+                  }}
                   onNavigateToSubscriptions={() => setScreen('subscriptions')}
+                  onNavigateToSupport={() => setScreen('support')}
+                  onNavigateToGateway={() => setScreen('gateway')}
+                  subscriptionCount={subscriptions.length}
                 />
               )}
 

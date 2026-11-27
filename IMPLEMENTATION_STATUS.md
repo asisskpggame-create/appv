@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last Updated: 2026-11-27 (0.4.12)
+Last Updated: 2026-11-27 (0.4.28)
 
 | Phase | Scope | Status | Honest Runtime Notes |
 |---|---|---|---|
@@ -41,3 +41,11 @@ Last Updated: 2026-11-27 (0.4.12)
 - 0.4.10: Python reference receiver for `/verify-login` + tests (unit tests and a TS-adapter-vs-Python round trip). Not wired into the real bot.
 - 0.4.11: signed `/verify-login` body includes a per-request `nonce` (double-tap safe with replay protection).
 - 0.4.12: five less-used screens load on demand (charts library no longer in the first download). Built and unit-checked with jsdom once; not run in a real browser.
+
+## Steps 0.4.13 - 0.4.27 (UI, session, Android native hardening)
+- **UI (0.4.13 - 0.4.16):** login-first flow, phone-first layout, bundled Vazirmatn, stats cards, dotted world map. `npm run check` (0.4.16) runs `tsc`, `npm test` and `vite build` in one go. Steps 28 and 29 were made without `node_modules`, so they have not been type-checked or built by me.
+- **Session storage (0.4.17 - 0.4.19):** texts corrected to say the session is in `localStorage`; a secure-store layer (`sessionStore.ts`) and the shell restore order are in and unit-tested, but **inactive until `capacitor-secure-storage-plugin` is installed** (needs `npm install`, CI list, `cap sync`).
+- **Android Java (0.4.20 - 0.4.27):** syntax check script (`native/android/scripts/syntax-check.sh`, 9 files OK); double-connect fix in the service (0.4.21) and in the JS adapter (`connectAny` guard, 0.4.22); `tcpProbe` total limit 20 s (0.4.23); foreground notification with Disconnect button (0.4.24); notification permission asked once after the first connect (0.4.25); `readTunnelStatus` with one controller request plus a time-limited fallback (0.4.26); brand notification icon (0.4.27).
+- **Design pass (0.4.28):** Home pill wording, optional sign-up link (`VITE_SIGNUP_URL`), plan line and add-subscription link. Notifications / smart DNS / theme rows from the design image are not built (no function behind them).
+- **What is NOT verified (all of 0.4.20 - 0.4.27):** none of this Java has been compiled against the Android SDK or run on a device. The tests for it are source guards (they read the text of the file). The first CI build is the first real compile. Points to check there: the `systemExempted` service type on Android 14+, the `/proxies` reply shape from sing-box, and the notification permission dialog on Android 13+.
+- **Still open:** secure-storage plugin install, sales-bot side of `/verify-login` (profile, purchased services, recovery), PasarGuard admin API schema, iOS and Windows engines, `bun.lock`, 360-430 px visual check.

@@ -222,3 +222,116 @@
   - Bilingual `en-US` (LTR) and `fa-IR` (RTL) localization provider with `Plus Jakarta Sans`, `Vazirmatn`, and `JetBrains Mono` typography.
   - Reusable commercial UI components: `BrandLogo`, `Button`, `Card`, `Input`, `SegmentedControl`, `StatusBanner`, `Dialog`, `Skeleton`, `EmptyState`, `ErrorState`.
   - Phase 1 Design System & Architecture Verification Workbench in `src/App.tsx`.
+
+## 0.4.28 (step 42)
+- **Compared the app with the design image** (`1000133315.png`) by reading the code, not by rendering it. Changes:
+  - **Home:** the connected pill now says "متصل هستید" (was "متصل و ایمن").
+  - **Sign-in:** a "ثبت‌نام در حساب کاربری" / "Create an account" link, shown only in password mode and only when `VITE_SIGNUP_URL` is set at build time (new `src/signupLink.ts`: https only, no embedded credentials, opens with `noopener`). Accounts are not created inside the app (operator or sales bot), so with no URL set the link stays hidden instead of pointing nowhere. Documented in `.env.example`.
+  - **Subscriptions:** a plan line such as `700 GB | 180 Days` under the name (new `planSummary.ts`): size from `totalBytes` (1 GiB units), days from `startsAt`/`expiresAt`; a part with no data is left out, nothing is made up. Plus an "افزودن اشتراک جدید" link at the bottom of the account tab that switches to the manual-import tab.
+- **Deliberately NOT done (design shows them, the app has no function behind them):** the "اعلان‌ها" (notifications) row, "DNS هوشمند" (the app only has a custom DNS field) and the "تم برنامه" row (the theme was locked to dark in 0.4.13; the design shows "روشن", which contradicts a dark-only UI, owner to decide). A switch that does nothing would be a lie. "تمدید اشتراک" still appears only when the panel gives an https renewal link.
+- **Tests:** `tests/designGapTests.ts` (6 tests, in `npm test`): URL validation (http, `javascript:`, credentials, garbage rejected), plan line cases (700 GB / 180 days, missing data, unlimited, bad dates), plus source guards for the Home wording, the sign-in link and the subscriptions wiring. With the Home wording reverted one test fails.
+- **Type check:** no `node_modules` here, so I ran `tsc` with no React types and only looked at errors that are not about missing types. It found one real error in my first version (`SIGNUP_URL` is still `string | null` inside `onClick`); fixed. The rest of the new code shows no such errors. NOT run: the real `tsc`, `npm run build`, and nothing was rendered, so spacing and look of the new lines are unchecked.
+- Design note: in the image the Upload card has a download arrow; that is a drawing mistake and was not copied.
+
+## 0.4.27 (step 41)
+- **Brand notification icon.** The foreground notification used a system lock icon. Now `native/android/res/drawable-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_stat_asis.png` (24/36/48/72/96 px, white on transparent, the "AS" letters cut out of `public/assets/asis-logo.png` by brightness, looked at by eye) are copied into the Android project by `install-native.sh`, and `AsisVpnService` uses them through `getIdentifier` (no dependency on the generated `R` class), falling back to the old system icon if the file is missing. The install step was run on a fake project: all 5 files land in `res/`.
+- **Caught by the syntax check, not by the tests:** my first version had `drawable-*/` inside a Java doc comment, and `*/` ended the comment early (`';' expected`). Fixed. Lesson kept in this file: the step 37 - 41 source-guard tests only read text, so always run `syntax-check.sh` after a Java edit.
+- **Tests:** one more in `tests/foregroundServiceTests.ts` (now 6): icon lookup, `setSmallIcon(statusIcon())`, all 5 PNGs exist and are PNGs, the install script copies `res/`.
+- **NOT verified:** how the icon looks on a real status bar (it is a hand-cut silhouette; thin strokes may look rough at 24 px). A designer-made monochrome icon is better when available; drop the 5 files over these.
+- `IMPLEMENTATION_STATUS.md` brought up to date (it was still at 0.4.12).
+
+## 0.4.26 (step 40)
+- **`readTunnelStatus` is now one request instead of one per server** (`AsisVpnPlugin.java`). It asks the local controller `GET /proxies` once (every outbound with its delay history) and builds the same result (`available`, `active`, `delays`) from it. Before: one request per server in a row, 3 s read timeout each, so a slow controller with N servers could take N x 3 s. The tag whitelist and the single-outbound case are unchanged. The controller reply size cap went from 256 KB to 1 MB (loopback, our own sing-box) so a big server list fits.
+- **Fallback kept:** if `/proxies` gives no answer or no `proxy` group, the old one-by-one path runs, now with a total limit of `STATUS_FALLBACK_MS` (6 s); servers not asked in time come back as `null` (unknown, not a failure). No JS change needed.
+- **Tests:** `tests/tunnelStatusTests.ts` (3 source-guard tests, in `npm test`). `syntax-check.sh` OK (9 files). The Java itself was NOT run (no Android jars here), so the parsing is checked by reading only.
+- **NOT verified:** that sing-box's `clash_api` answers `GET /proxies` with `{"proxies": {tag: {history: [...]}}}` as I expect (from memory of the Clash API; no core available offline). On a device with the tunnel up, open the server list and check delays still show; if they all turn to "unknown", the fallback is what you are seeing, tell me and I will look at the real reply.
+- Open items from step 35 are now all handled. Remaining: device/CI verification, secure-storage plugin install, bot-side work (see earlier list).
+
+## 0.4.25 (step 39)
+- **Notification permission (Android 13+)** (`AsisVpnPlugin.java`, `patch_android.py`). The foreground notification from 0.4.24 is hidden on Android 13+ until `POST_NOTIFICATIONS` is granted. The plugin now asks for it **once per install**, only **after the tunnel is up** (so it never stacks on the VPN consent dialog), and the answer is not waited for: a refusal, a missing activity or any exception does not touch the connect result. Below Android 13, or when already granted, nothing is asked. The manifest patch declares the permission (still idempotent; checked twice on a sample manifest, valid XML).
+- **Tests:** one more source-guard test in `tests/foregroundServiceTests.ts` (now 5): asked only after `call.resolve()`, API/granted/already-asked checks, flag saved, no `call.reject` inside. With the "already asked" line removed it fails. `syntax-check.sh` OK (9 files).
+- **NOT verified:** on a device. Please check on Android 13+: after the FIRST successful connect the system permission dialog appears once; after allowing, the notification shows; after denying, nothing is asked again on later connects (to see it again: clear app data).
+- Trade-off: the dialog shows while the app is already connected, not before. That keeps connect fast and avoids two dialogs at once.
+
+## 0.4.24 (step 38)
+- **Foreground notification for the VPN service** (`AsisVpnService.java`, `patch_android.py`). On connect the service now calls `startForeground` with an ongoing, low-importance notification ("Connecting..." then "Connected", Persian when the phone language is `fa`) with a **Disconnect** button (sends `ACTION_STOP`) and a tap target that opens the app. It is removed on disconnect, on every failed-start path, on revoke and in `onDestroy`. Goal: Android is less likely to kill the tunnel when the app is in the background.
+- **Never fatal:** if the system refuses `startForeground` (missing permission, background-start limits) the error is logged and the tunnel runs exactly as before.
+- **Manifest** (`patch_android.py`, still idempotent): adds `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SYSTEM_EXEMPTED` permissions and `android:foregroundServiceType="systemExempted"` on the service. I ran the script twice on a sample manifest: second run changes nothing, result is valid XML.
+- **Tests:** `tests/foregroundServiceTests.ts` (4 source-guard tests, in `npm test`); with `leaveForeground()` removed from `onDestroy` one of them fails. `syntax-check.sh` OK (9 files).
+- **NOT verified, please check on a device / CI:**
+  - `systemExempted` is the type I believe applies to VPN apps on Android 14+; I could not check the Android docs offline. If the CI build or Android 14 device rejects it, try `specialUse` (needs a property tag) and tell me the error.
+  - Android 13+ asks for the `POST_NOTIFICATIONS` permission; without it the service still runs but the notification may be hidden. The app does not ask for it yet.
+  - The small icon is a system lock icon (`ic_lock_lock`), a placeholder until a proper white-on-transparent icon is added.
+- Still open: `readTunnelStatus` asks the controller one server at a time.
+
+## 0.4.23 (step 37)
+- **`tcpProbe` now has an overall time limit** (`native/android/src/com/asisvpn/client/vpn/AsisVpnPlugin.java`). Before, the plugin waited for every target with no total limit, so a slow DNS lookup or many servers could keep "ping all" running for minutes. Now the whole call stops at `PROBE_OVERALL_MS` (20 s): targets that did not finish are cancelled and returned as `available: false, latencyMs: null, error: "timeout"`; finished targets keep their results. Result order and count are unchanged, so the JS side needs no change.
+- **Test:** `tests/probeLimitTests.ts` (source guard, in `npm test`): checks the deadline constant, the timed `get`, and the `timeout` result. It reads the Java file; it does not run it.
+- Run here: `native/android/scripts/syntax-check.sh` (9 files OK). NOT run: the probe on a device, `tsc`, full `npm test`, build.
+- Still open: no foreground notification for the VPN service; `readTunnelStatus` asks the controller once per server in sequence.
+
+## 0.4.22 (step 36)
+- **Connect guard in the engine adapter** (`src/engine/webEngineAdapter.ts`, `connectAny`): overlapping connects can no longer run together. The SAME request while one is running shares it (one native connect, both callers get the same result); a DIFFERENT request waits for the running one to finish and then runs (native treats it as a switch); a failed attempt does not block the next. Before, only the main button was disabled while busy, so auto-connect, auto-switch or a quick second tap could start two native connects at once. This is the JS side of the Java fix in 0.4.21. The old body of `connectAny` is now `connectNow`, unchanged.
+- **Tests:** new `tests/connectGuardTests.ts` (4 tests, in `npm test`) with a fake native bridge whose `connect` is held open by the test: same request twice = 1 native call; different requests = never 2 running at once and in order; failure then next works; finished request connects again. I ran it here with `node --test`: 4/4 pass, and with the guard removed it fails; `engineTests` still 12/12.
+- Run here: those two files plus `accountTests`, `lazyScreensTests`, `sessionSecureStoreTests`, `shellSessionRestoreTests` (all pass). NOT run: `tsc`, full `npm test`, build, a device.
+- Still open from 0.4.21: `tcpProbe` has no overall time limit, and no foreground notification for the VPN service.
+
+## 0.4.21 (step 35)
+- **Read-through of the Android Java** (`AsisVpnPlugin`, `AsisVpnService`, `VpnRuntime`, `patch_android.py`) by reading only (no Android SDK here). Two real problems fixed in `AsisVpnService.java`:
+  - **Quick double connect killed the tunnel.** Two `ACTION_START` intents in a row: the first one takes the pending config, the second gets `null`, and `start()` used to call `stopEngine()` before looking at the config, so the second one tore down the working tunnel and set `ENGINE_INVALID_INPUT`. Now a start without a config is ignored while an engine runs or is connecting; the config check also comes before `stopEngine()`.
+  - **A failing `stop()` hid the real error.** After a failed start, `next.stop()` could throw a `RuntimeException` out of the worker task, leaving the state at "Connecting" until the 15 s timeout. Now `safeStop()` logs it and the real error code is reported.
+- Checked: `native/android/scripts/syntax-check.sh` passes (9 files). NOT run: the service itself (needs Android); the fix is reasoned from the code, not tested on a device.
+- **Found, not changed (decide later):**
+  - `tcpProbe`: waits on each result with no overall time limit and DNS has no timeout; with many servers the "ping all" call can take minutes in the worst case (8 threads, 2 attempts x timeout per server).
+  - `readTunnelStatus`: asks the local controller once per server, one after another (3 s read timeout each); fine locally, slow if the controller hangs.
+  - `AsisVpnService` is started with `startService` and never calls `startForeground`; this is allowed for a VPN started from the foreground app, but if Android kills the app in the background the tunnel can end with it. A foreground notification would make it more durable.
+  - The JS adapter (`webEngineAdapter.connectAny`) has no guard against a second `connect` while one is running; only the main button is disabled while busy. Auto-connect or auto-switch could still overlap, which is why the service fix above matters.
+
+## 0.4.20 (step 34)
+- **First real check of the Android Java code.** Until now the 9 Java files (`native/android/src`, `engine-libbox`) were never compiled anywhere. This environment has a JDK compiler but no Android SDK, so I ran the compiler without the Android / Capacitor / libbox jars: **no syntax errors, no bad types, no duplicate names** in the 9 files; the only errors are the expected "cannot find symbol / package does not exist" ones for the missing libraries. (The first run also reported `EngineFactory` as a duplicate: that is only because `engine-stub` and `engine-libbox` are alternatives and I had fed both; the script now checks libbox only.)
+- New `native/android/scripts/syntax-check.sh` (+ `JavaSyntaxCheck.java`): repeats this check with `bash native/android/scripts/syntax-check.sh` (needs a JDK). I tested it by deleting a `;` in a copy of `VpnRuntime.java`: it reported `';' expected` and failed, then passed again after restoring the file.
+- Other things run here that need no packages: `python3 test_receiver.py` 7/7 OK; `bash -n` on the three scripts in `native/android/scripts`; `py_compile` on `patch_android.py`; `android-apk.yml` parses as valid YAML.
+- **What this does NOT prove:** that the Java uses the Android, Capacitor and libbox APIs correctly (method names, signatures, permissions), or that Gradle builds. Only the first CI build or a device build shows that. No app code changed.
+
+## 0.4.19 (step 33)
+- **Secure session storage, part 2 of 2: wired into the app shell** (`src/client/AsisClientShell.tsx`). If the secure-storage plugin is present, the shell starts in a short "restoring" state (blank screen, no sign-in flash), loads the saved session with `loadSessionSecure()`, and only then (a) allows the save effect to run and (b) does the launch token refresh. Saving always goes through `persistSessionSecure()`. Without the plugin nothing changes: the synchronous load and the same save/refresh behaviour as before (`sessionRestoring` is false from the start).
+- Why the order matters: the empty initial state must never be saved while restoring, or it would erase the stored session. `tests/shellSessionRestoreTests.ts` (3 source-guard tests, in `npm test`) checks this order, the screen order (restoring before sign-in) and that the old direct `persistSession` call is gone. I ran it here: 3/3 pass, and with the "do not save while restoring" line removed it fails.
+- **Not active until the plugin is installed.** To turn it on, where `npm install` works: install `capacitor-secure-storage-plugin` at a version that supports Capacitor 7 (check its README; I could not check offline), add it to the install list in `.github/workflows/android-apk.yml` and run `npx cap sync android`. Until then the app still uses `localStorage`, as the 0.4.17 texts say. After it is active, update the login-screen text and `SECURITY.md` again.
+- Run here: the two session tests (10/10), and a type-parse check of the edited files (no syntax or unknown-name errors; full `tsc` could not run without `node_modules`). NOT run: full `npm test`, build, the app on a device (the restore flow itself is only checked by reading and by the source guard, not rendered).
+
+## 0.4.18 (step 32)
+- **Secure session storage, part 1 of 2 (storage layer only, not used by the UI yet).** `src/features/auth/sessionStore.ts` gets `getSecureStore()`, `loadSessionSecure()` and `persistSessionSecure()`. If a secure-storage Capacitor plugin is installed (read from `window.Capacitor.Plugins.SecureStoragePlugin`, the `get/set/remove({key,value})` API of `capacitor-secure-storage-plugin`), the session goes to the system store (Android Keystore / iOS Keychain) instead of `localStorage`; an old `localStorage` session is moved into it once and then deleted; if a vault write fails the old storage is used so nobody gets signed out. No plugin installed (today): identical to the old behaviour. Existing functions are unchanged (only the JSON check moved into a shared helper).
+- **Tests:** new `tests/sessionSecureStoreTests.ts` (7 tests, added to `npm test`) with a fake plugin and fake `window`: save to vault, one-time migration, clear, vault failure fallback, garbage in vault, no plugin, browser. I ran this file here with plain `node --test`: 7/7 pass, and with the "remove old copy" line deleted one test fails (so it does check that).
+- **Part 2 (next step, not done):** use it in `AsisClientShell.tsx`. Needs care: the session loads asynchronously, so the "save on change" effect must not run (and wipe the vault) before the first load finishes, and sign-in must wait for it. Also add the plugin to the CI install list and to `native` setup. I did not pick a plugin version because I cannot check Capacitor 7 compatibility offline.
+- Run here: only the new test file, plus `engineTests`, `accountTests`, `lazyScreensTests` (22 pass; 2 failures in this batch are `runTests.ts` failing to import `express`, which is not installed here). NOT run: `tsc`, full `npm test`, build.
+
+## 0.4.17 (step 31)
+- **Honest security text.** Code review found that the installed app keeps the session (including the refresh token) in the WebView's `localStorage` (`persistSession` / `loadPersistedSession` in `sessionStore.ts`), while the login screen text (`securityNoteBody`, fa + en) said native builds use Android Keystore / iOS Keychain / Windows DPAPI, and the file comment said tokens are never persisted. Texts and comment now say what the code really does. No behaviour changed; the password itself is still never saved.
+- **Still open:** store the session in the system secure store (e.g. a Capacitor secure-storage plugin backed by Android Keystore) instead of `localStorage`. Needs a package install, so it must be done where `npm install` works.
+- NOT run here: `tsc`, `npm test`, build (no `node_modules`). Only string/comment edits; no test refers to the old text (grepped).
+
+## 0.4.16 (step 30)
+- No app code changed. New `scripts/check.sh` + `npm run check`: install if `node_modules` is missing, then `tsc --noEmit`, `npm test`, `vite build`, stopping at the first failure and printing `ALL OK` at the end. Documented in `TESTING.md`; `TODO-UI.md` step 0 baseline item is now a single command.
+- Why: steps 28 and 29 (stats cards, world map) were made without `node_modules` or network, so they have never been type-checked or built. Run `npm run check` once on your machine; if it fails, send me the first error and I fix it.
+- NOT run here (same reason). The script itself was only checked with `bash -n`.
+
+## 0.4.15 (step 29)
+- **Home** (`src/features/home/HomeView.tsx`, new `src/features/home/WorldMapDots.tsx`): the hero area behind the logo now has a dotted world map (632 dots from coarse continent outlines on a 5-degree grid, one SVG path, glow colour from `--asis-glow-rgb`, faded at the edges, 40% opacity). It is decoration only, not geographic data, and the old glow gradient stays under it.
+- `TODO-UI.md`: ticked the world-map item; also ticked two items that were already built but left unticked (Tehran skyline in `LoginScreen.tsx`, connected pill via `StatusBanner` on Home). Left open: step 0 setup items and the 360-430 px / desktop test.
+- NOT checked: `tsc --noEmit`, `npm test`, build and the real screen (no `node_modules`, no network, no browser here). If the map looks too strong or too weak, change `opacity-40` on the `WorldMapDots` element in `HomeView.tsx`.
+
+## 0.4.14 (step 28)
+- **Statistics screen** (`src/features/statistics/StatisticsView.tsx`): the one-line text summary above the chart is now three small cards in a row: Download, Upload and Total (دانلود / آپلود / مصرف کل), using the same totals the chart already computed (`totalDownloadBytes`, `totalUploadBytes`, `totalBytes`). "Peak" and the axis unit stay as a small line under the cards. Numbers are forced left-to-right so units do not flip in Persian.
+- `TODO-UI.md` step 8 item "download / upload cards and total usage" is now ticked.
+- NOT checked here: `tsc --noEmit`, `npm test` and the real screen (no `node_modules` and no network in this environment, no browser). Owner test steps: `npm install && npx tsc --noEmit && npm test`, then `npm run dev`, open Statistics with usage data and check the three cards on a 360-430 px width in Persian and English.
+
+## 0.4.13
+- Login-first flow: the app now opens on a full-screen sign-in (username/password or subscription link) with a "continue without account" option; the session is kept in the installed app and renewed on launch.
+- Mobile-first layout: desktop top bar hidden on phones, new single-column Home screen (status pill, timer, download/upload cards, server card, power button).
+- Fonts bundled locally (@fontsource/vazirmatn); Google Fonts link removed (it was render-blocking where Google is unreachable).
+- Servers: compact mobile toolbar (smart select, ping test, add, refresh); desktop-only header, policy card and filters hidden on phones.
+- Subscriptions / Statistics / Settings: desktop page headers hidden on phones, tighter spacing.
+- Account: profile card plus shortcuts to subscriptions, support and API gateway (these are no longer in the phone tab bar).
+- Declutter: theme locked to dark/azure (no theme or palette switchers), settings reduced to essentials with "Advanced" collapsed, local-engine stats card and chart-type/source toggles removed, Home reduced to status/transfer/server/power, API gateway removed from navigation, login reduced to one form with a text link for subscription-link sign-in.
+- Brand: BrandLogo now uses the official AS neon-ring mark (public/assets/asis-logo.png, cropped from the design); duplicate toggles removed from Advanced settings.
+- Brand: icon, adaptive icon, splash, boot splash and in-app logo now generated from the official logo (assets/brand/asis-logo-source.jpg).

@@ -91,7 +91,30 @@ export class AsisVpnEngineAdapter implements VpnEngineAdapter {
     return window.AsisNativeBridge.runTunnelTest();
   }
 
-  private async connectAny(outbounds: SanitizedOutboundConfig[], policy: AdvancedConnectionPolicy): Promise<void> {
+  /**
+   * Guards against overlapping connects (auto-connect, auto-switch and a tap can race):
+   * the SAME request while one is running shares that attempt (one native connect, not two);
+   * a DIFFERENT request waits for the running one to finish, then runs (the native side
+   * handles it as a switch). A failed attempt never blocks the next one.
+   */
+  private inFlight: { key: string; promise: Promise<void> } | null = null;
+  private connectChain: Promise<void> = Promise.resolve();
+
+  private connectAny(outbounds: SanitizedOutboundConfig[], policy: AdvancedConnectionPolicy): Promise<void> {
+    const key = JSON.stringify([outbounds.map((o) => o.singBoxOutbound), policy]);
+    if (this.inFlight?.key === key) return this.inFlight.promise;
+    const run = this.connectChain.catch(() => undefined).then(() => this.connectNow(outbounds, policy));
+    this.connectChain = run;
+    const entry = { key, promise: run };
+    this.inFlight = entry;
+    const clear = () => {
+      if (this.inFlight === entry) this.inFlight = null;
+    };
+    run.then(clear, clear);
+    return run;
+  }
+
+  private async connectNow(outbounds: SanitizedOutboundConfig[], policy: AdvancedConnectionPolicy): Promise<void> {
     const outbound = outbounds[0];
     this.currentOutbound = outbound;
     this.state = 'Preparing';

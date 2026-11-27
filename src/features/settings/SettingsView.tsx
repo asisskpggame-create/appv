@@ -82,6 +82,7 @@ export function SettingsView({
   const isFa = locale === 'fa-IR';
   const isWeb = platform === 'web';
 
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<AppUpdateResponse | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
@@ -178,8 +179,8 @@ export function SettingsView({
   })();
 
   return (
-    <div className="space-y-8 text-start">
-      <div className="flex items-center gap-3.5 border-b border-[var(--asis-border)] pb-5">
+    <div className="space-y-5 text-start md:space-y-8">
+      <div className="hidden items-center gap-3.5 border-b border-[var(--asis-border)] pb-5 md:flex">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
           <Settings className="w-5 h-5" aria-hidden="true" />
         </div>
@@ -209,23 +210,6 @@ export function SettingsView({
             options={[
               { value: 'fa-IR', label: 'فارسی' },
               { value: 'en-US', label: 'English' },
-            ]}
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-          <span className="flex items-center gap-3 text-sm font-medium">
-            <Moon className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            {isFa ? 'تم برنامه' : 'Theme'}
-          </span>
-          <SegmentedControl<'dark' | 'light' | 'system'>
-            ariaLabel="Theme"
-            value={themePreference}
-            onChange={setThemePreference}
-            options={[
-              { value: 'dark', label: isFa ? 'تیره' : 'Dark' },
-              { value: 'light', label: isFa ? 'روشن' : 'Light' },
-              { value: 'system', label: isFa ? 'سیستم' : 'Auto' },
             ]}
           />
         </div>
@@ -311,64 +295,6 @@ export function SettingsView({
         )}
       </Card>
 
-      {/* 3-Column Active Tunnel Policy Summary */}
-      <div className="hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-3">
-        <Card interactive padding="sm" className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs text-[var(--asis-text-secondary)]">
-            <span>{isFa ? 'حالت مسیریابی' : 'Routing Mode'}</span>
-            <Compass className="w-4 h-4 text-[var(--asis-accent-fg)] transition-transform duration-150 group-hover:scale-110" aria-hidden="true" />
-          </div>
-          <p className="font-mono text-sm font-semibold">
-            {policy.routingMode === 'global'
-              ? isFa
-                ? 'سراسری (Global TUN)'
-                : 'Global TUN'
-              : isFa
-                ? 'مبتنی بر قوانین'
-                : 'Rule-Based'}
-          </p>
-        </Card>
-
-        <Card interactive padding="sm" className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs text-[var(--asis-text-secondary)]">
-            <span>{isFa ? 'تونل‌سازی تفکیکی' : 'Split Tunneling'}</span>
-            <Split className="w-4 h-4 text-[var(--asis-accent-fg)] transition-transform duration-150 group-hover:scale-110" aria-hidden="true" />
-          </div>
-          <p className="font-mono text-sm font-semibold">{splitModeSummary}</p>
-        </Card>
-
-        <Card interactive padding="sm" className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs text-[var(--asis-text-secondary)]">
-            <span>{isFa ? 'DNS و MTU فعال' : 'Active DNS & MTU'}</span>
-            <ServerCog className="w-4 h-4 text-[var(--asis-accent-fg)] transition-transform duration-150 group-hover:scale-110" aria-hidden="true" />
-          </div>
-          <p className="font-mono text-sm font-semibold">
-            {policy.customDns || '1.1.1.1'} · {policy.mtu}
-          </p>
-        </Card>
-      </div>
-
-      {/* General: Language, Mode & Color Palette */}
-      <Card className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--asis-border)] pb-5">
-          <div className="flex items-center gap-2">
-            <Languages className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
-            <p className="text-sm font-semibold">{isFa ? 'زبان رابط کاربری' : 'Application Language'}</p>
-          </div>
-          <SegmentedControl<LocaleCode>
-            ariaLabel="Language"
-            value={locale}
-            onChange={setLocale}
-            options={[
-              { value: 'en-US', label: 'English (LTR)' },
-              { value: 'fa-IR', label: 'فارسی (RTL)' },
-            ]}
-          />
-        </div>
-
-        <ThemePaletteSwitcher variant="panel" />
-      </Card>
-
       {/* Platform Limitation Notice */}
       {isWeb && (
         <StatusBanner
@@ -440,8 +366,21 @@ export function SettingsView({
         />
       </Card>
 
+      <button
+        type="button"
+        onClick={() => setShowAdvanced((v) => !v)}
+        aria-expanded={showAdvanced}
+        className="flex w-full items-center justify-between rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)] px-4 py-3.5 text-sm font-medium cursor-pointer"
+      >
+        <span className="flex items-center gap-3">
+          <Sliders className="h-4 w-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+          {isFa ? 'تنظیمات پیشرفته' : 'Advanced'}
+        </span>
+        <span className="text-xs text-[var(--asis-text-secondary)]">{showAdvanced ? '−' : '+'}</span>
+      </button>
+
       {/* Advanced Connection Settings */}
-      <Card className="space-y-6">
+      <Card className={`space-y-6 ${showAdvanced ? '' : 'hidden'}`}>
         <div className="flex items-center gap-3 border-b border-[var(--asis-border)] pb-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
             <Sliders className="w-4 h-4" aria-hidden="true" />
@@ -548,71 +487,6 @@ export function SettingsView({
             allowLocalNetwork={policy.allowLocalNetwork}
             onChange={(killSwitch) => onPolicyChange({ ...policy, killSwitch })}
           />
-
-          <div className="flex items-center justify-between gap-4 py-3.5 text-sm">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
-                <Wifi className="h-4 w-4" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium">
-                  {isFa ? 'اتصال مجدد خودکار' : 'Automatic Reconnection'}
-                </p>
-                <p className="text-xs text-[var(--asis-text-secondary)]">
-                  {isFa
-                    ? 'برقراری مجدد هنگام تغییر شبکه Wi-Fi و موبایل'
-                    : 'Recover tunnel on Wi-Fi / cellular handoff'}
-                </p>
-              </div>
-            </div>
-            <ToggleSwitch
-              checked={policy.autoReconnect}
-              onChange={(autoReconnect) => onPolicyChange({ ...policy, autoReconnect })}
-              ariaLabel="Automatic Reconnection"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 py-3.5 text-sm">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
-                <Shuffle className="h-4 w-4" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium">{isFa ? 'اتوسوییچ بین سرورها' : 'Auto-switch servers'}</p>
-                <p className="text-xs text-[var(--asis-text-secondary)]">
-                  {isFa
-                    ? 'با اتصال به چند سرور اشتراک، سریع‌ترین مسیر (با تست واقعی از داخل تانل) خودکار انتخاب می‌شود'
-                    : 'Connects with several servers of the subscription and keeps the fastest one, measured through the tunnel'}
-                </p>
-              </div>
-            </div>
-            <ToggleSwitch
-              checked={policy.autoSwitch === true}
-              onChange={(autoSwitch) => onPolicyChange({ ...policy, autoSwitch })}
-              ariaLabel="Auto-switch servers"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 py-3.5 text-sm">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
-                <Power className="h-4 w-4" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium">{isFa ? 'اتصال خودکار هنگام باز شدن اپ' : 'Connect when the app opens'}</p>
-                <p className="text-xs text-[var(--asis-text-secondary)]">
-                  {isFa
-                    ? 'با باز کردن اپ، به آخرین سرور انتخابی وصل می‌شود. اولین اتصال را باید خودتان بزنید.'
-                    : 'Connects to your last server each time the app starts. The very first connection must be made manually.'}
-                </p>
-              </div>
-            </div>
-            <ToggleSwitch
-              checked={policy.autoConnect === true}
-              onChange={(autoConnect) => onPolicyChange({ ...policy, autoConnect })}
-              ariaLabel="Connect when the app opens"
-            />
-          </div>
 
           <div className="flex items-center justify-between gap-4 py-3.5 text-sm">
             <div className="flex items-center gap-3 min-w-0">

@@ -23,8 +23,8 @@
     --asis-skeleton-b: #F4F8FF;
     --asis-chart-primary: #087BFF;
     --asis-chart-secondary: #10B981;
-    --asis-font-latin: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --asis-font-persian: 'Vazirmatn', 'Plus Jakarta Sans', system-ui, sans-serif;
+    --asis-font-latin: 'Vazirmatn', 'Noto Sans Arabic', Roboto, system-ui, -apple-system, sans-serif;
+    --asis-font-persian: 'Vazirmatn', 'Noto Sans Arabic', Roboto, system-ui, sans-serif;
     --asis-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
   }
 

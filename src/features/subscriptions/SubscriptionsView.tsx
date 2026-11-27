@@ -33,6 +33,7 @@ import {
 import { fetchAccountSubscriptions } from './accountSync';
 import { subscriptionTranslations } from './subscriptionTranslations';
 import type { SubscriptionRecord } from './types';
+import { planSummary } from './planSummary';
 
 interface SubscriptionsViewProps {
   session?: AuthSession | null;
@@ -341,10 +342,10 @@ export function SubscriptionsView({
   const visibleList = tab === 'account' ? accountSubscriptions : importedSubscriptions;
 
   return (
-    <div className="space-y-8 text-start">
+    <div className="space-y-5 text-start md:space-y-8">
       {/* Header + Method Tabs */}
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--asis-border)] pb-5">
-        <div>
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--asis-border)] pb-5 max-md:border-0 max-md:pb-0">
+        <div className="hidden md:block">
           <h2 className="text-xl font-semibold tracking-tight">{t.title}</h2>
           <p className="mt-1 text-sm text-[var(--asis-text-secondary)]">{t.subtitle}</p>
         </div>
@@ -410,6 +411,15 @@ export function SubscriptionsView({
               ))}
             </div>
           ) : null}
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              onClick={() => setTab('imported')}
+              className="text-sm text-[var(--asis-accent-fg)] underline-offset-4 hover:underline"
+            >
+              {locale === 'fa-IR' ? 'افزودن اشتراک جدید' : 'Add a new subscription'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -588,6 +598,11 @@ export function SubscriptionsView({
                             · {sub.type} · {sub.status}
                           </span>
                         </div>
+                        {planSummary(sub) && (
+                          <p dir="ltr" className="mt-1 text-sm font-medium text-start">
+                            {planSummary(sub)}
+                          </p>
+                        )}
                         <p className="mt-1 font-mono text-xs text-[var(--asis-text-secondary)]">
                           SHA-256: {sub.fingerprintHash.slice(0, 16)}…
                         </p>

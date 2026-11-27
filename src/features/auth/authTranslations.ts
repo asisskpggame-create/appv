@@ -134,7 +134,7 @@ export const authTranslations: Record<LocaleCode, AuthCopy> = {
     stateClear: 'Reset',
     securityNoteTitle: 'Token & Credential Protection',
     securityNoteBody:
-      'Passwords are never stored in plaintext or cached locally. Web preview holds tokens strictly in memory; native builds use Android Keystore, iOS Keychain, and Windows DPAPI.',
+      'Your password is never saved on the device. The web preview keeps the session only in memory; the installed app keeps the session on this device (app storage, not yet the system secure store) so you stay signed in.',
     sessionActiveTitle: 'Active Authenticated Session',
     sessionLogout: 'Sign Out',
     sessionRevokeAll: 'Revoke Device Session',
@@ -208,7 +208,7 @@ export const authTranslations: Record<LocaleCode, AuthCopy> = {
     stateClear: 'بازنشانی',
     securityNoteTitle: 'حفاظت از توکن و اطلاعات ورود',
     securityNoteBody:
-      'رمز عبور هرگز به‌صورت متن ساده ذخیره نمی‌شود. در پیش‌نمایش وب توکن‌ها فقط در حافظه موقت نگهداری می‌شوند و در نسخه‌های بومی از Keystore، Keychain و DPAPI استفاده می‌شود.',
+      'رمز عبور شما هرگز روی دستگاه ذخیره نمی‌شود. در پیش‌نمایش وب نشست فقط در حافظه موقت می‌ماند؛ اپ نصب‌شده نشست را روی همین دستگاه (حافظه‌ی خود اپ، هنوز نه مخزن امن سیستم) نگه می‌دارد تا واردشده بمانید.',
     sessionActiveTitle: 'نشست فعال احراز هویت‌شده',
     sessionLogout: 'خروج امن',
     sessionRevokeAll: 'لغو نشست دستگاه',

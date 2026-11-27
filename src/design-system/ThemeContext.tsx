@@ -19,7 +19,8 @@ const LOCALE_STORAGE_KEY = 'asis_locale_pref_v1';
 function readStoredThemePreference(): ThemePreference {
   if (typeof window === 'undefined') return 'dark';
   try {
-    return normalizeThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY));
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
+    return 'dark';
   } catch {
     // Ignore storage read errors
   }
@@ -29,7 +30,8 @@ function readStoredThemePreference(): ThemePreference {
 function readStoredPalette(): ThemePalette {
   if (typeof window === 'undefined') return 'azure';
   try {
-    return normalizeThemePalette(window.localStorage.getItem(PALETTE_STORAGE_KEY));
+    window.localStorage.removeItem(PALETTE_STORAGE_KEY);
+    return 'azure';
   } catch {
     // Ignore storage read errors
   }

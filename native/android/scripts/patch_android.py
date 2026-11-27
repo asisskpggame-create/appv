@@ -16,6 +16,22 @@ if "ACCESS_NETWORK_STATE" not in text:
         1,
     )
 
+if "FOREGROUND_SERVICE" not in text:
+    text = text.replace(
+        "<application",
+        '<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n'
+        '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />\n'
+        '    <application',
+        1,
+    )
+
+if "POST_NOTIFICATIONS" not in text:
+    text = text.replace(
+        "<application",
+        '<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application',
+        1,
+    )
+
 if "<queries>" not in text:
     queries = (
         "<queries>\n"
@@ -33,6 +49,7 @@ if "AsisVpnService" not in text:
         '    <service\n'
         '        android:name="com.asisvpn.client.vpn.AsisVpnService"\n'
         '        android:exported="false"\n'
+        '        android:foregroundServiceType="systemExempted"\n'
         '        android:permission="android.permission.BIND_VPN_SERVICE">\n'
         '        <intent-filter>\n'
         '            <action android:name="android.net.VpnService" />\n'

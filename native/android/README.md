@@ -22,5 +22,5 @@ The CI runs these after `cap add android`. If `libbox.aar` cannot be built, or t
 - "Connected" means the tunnel is up. The remote server is not probed yet.
 - Local engine statistics (bytes, speed) are not read yet; the plugin returns only the session duration.
 - App-level Kill Switch is not implemented; use Android's Always-on VPN + "Block connections without VPN".
-- No foreground notification yet: Android may stop the service in the background.
+- Foreground notification added in 0.4.24, notification permission asked once after the first connect in 0.4.25 (unverified on a device; see CHANGELOG for the Android 14 service-type and Android 13 notification-permission caveats).
 - The debug APK gets large because `libbox.aar` ships all ABIs.
