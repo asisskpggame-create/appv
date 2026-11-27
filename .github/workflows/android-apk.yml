@@ -1,0 +1,148 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # If a project .zip was uploaded to the repo root, unpack it over the
+      # repo (the workflow file itself is left alone), commit it, and go on.
+      - name: Apply uploaded project zip (if present)
+        run: |
+          ZIP=$(ls -1 ./*.zip 2>/dev/null | head -n1 || true)
+          if [ -n "$ZIP" ]; then
+            echo "Found $ZIP"
+            rm -rf _zip && mkdir _zip && unzip -q -o "$ZIP" -d _zip
+            SRC=_zip
+            if [ "$(ls -1 _zip | wc -l)" = "1" ] && [ -d "_zip/$(ls -1 _zip)" ]; then
+              SRC="_zip/$(ls -1 _zip)"
+            fi
+            rsync -a --exclude '.github' --exclude '.git' "$SRC"/ ./
+            rm -rf _zip
+            git rm -q -f "$ZIP" || rm -f "$ZIP"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Apply uploaded project zip" || true
+            git push || echo "push skipped"
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Install Capacitor
+        run: >
+          npm install --no-save
+          @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+          @capacitor/status-bar@7 @capacitor/splash-screen@7
+          @capacitor/assets@3
+
+      # Safety net for repos that don't have the patched sources yet.
+      - name: Ensure native-shell files exist
+        run: |
+          if [ ! -f src/apiBase.ts ]; then
+            cat > src/apiBase.ts <<'EOF'
+          const base = String((import.meta as any).env?.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
+          if (base && typeof window !== 'undefined') {
+            const orig = window.fetch.bind(window);
+            window.fetch = ((input: any, init?: any) => {
+              if (typeof input === 'string' && input.startsWith('/api/')) {
+                return orig(base + input, init);
+              }
+              return orig(input, init);
+            }) as typeof window.fetch;
+          }
+          export {};
+          EOF
+            grep -q apiBase src/main.tsx || sed -i "1i import './apiBase.ts';" src/main.tsx
+          fi
+          if [ ! -f capacitor.config.json ]; then
+            cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.asisvpn.client",
+            "appName": "ASiS VPN",
+            "webDir": "dist",
+            "server": { "androidScheme": "https", "cleartext": true },
+            "android": { "allowMixedContent": true }
+          }
+          EOF
+          fi
+
+      - name: Build web
+        env:
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: npm run build
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Generate icon and splash
+        run: |
+          if [ -d assets ]; then
+            npx capacitor-assets generate --android
+          else
+            echo "No assets/ folder: keeping default icon"
+          fi
+
+      - name: Android manifest tweaks (haptics)
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q "android.permission.VIBRATE" "$M" || sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.VIBRATE" />#' "$M"
+          grep -n "uses-permission" "$M"
+
+      - name: Sync
+        run: npx cap sync android
+
+      # sing-box core. Pin with the repository variable SING_BOX_REF (default in the script).
+      # A failure here is not fatal: the app is then built with the stub engine, which
+      # reports ENGINE_LIBBOX_MISSING instead of pretending to connect.
+      - name: Build sing-box core (libbox.aar)
+        continue-on-error: true
+        env:
+          SING_BOX_REF: ${{ vars.SING_BOX_REF }}
+        run: bash native/android/scripts/build-libbox.sh
+
+      - name: Install native VPN plugin
+        run: bash native/android/scripts/install-native.sh
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          if ./gradlew assembleDebug --no-daemon; then
+            echo "Built with: $([ -f app/libs/libbox.aar ] && echo 'sing-box core' || echo 'stub engine (no core)')"
+          elif [ -f app/libs/libbox.aar ]; then
+            echo "::warning::The build with the sing-box core failed (see the log above). Rebuilding with the stub engine."
+            cd ..
+            bash native/android/scripts/install-native.sh --stub
+            cd android
+            ./gradlew assembleDebug --no-daemon
+          else
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: asis-vpn-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk

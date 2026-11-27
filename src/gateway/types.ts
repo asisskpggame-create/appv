@@ -30,7 +30,10 @@ export interface PasarGuardInstanceConfig {
   instanceId: string;
   label: string;
   baseUrl: string;
-  serviceToken: string;
+  /** Admin/service token. Optional: subscription-link login needs none. */
+  serviceToken?: string;
+  /** Public subscription prefix, e.g. https://sub.example.com:8443/sub. Defaults to `${baseUrl}/sub`. */
+  subscriptionBaseUrl?: string;
 }
 
 export type TrafficGranularity = '24h' | '7d' | '30d';
@@ -66,6 +69,7 @@ export interface PasarGuardUserRecord {
   uploadTrafficBytes?: number | null;
   usageHistory?: TrafficHistoryBucket[];
   expiresAt: string | null;
+  createdAt?: string | null;
   subscriptionUrl?: string;
 }
 
@@ -79,8 +83,10 @@ export interface ResellerCustomerRecord {
   customerId: string;
   username: string;
   status: 'active' | 'suspended';
-  allowedDevices: number;
+  allowedDevices: number | null;
   renewalUrl?: string;
+  /** PasarGuard subscription link of this customer; lets password login reuse the link-login pipeline. */
+  subscriptionUrl?: string;
 }
 
 export interface ResellerPurchasedService {
@@ -94,7 +100,7 @@ export interface ResellerPurchasedService {
   expiresAt: string | null;
   totalBytes: number | null;
   usedBytes: number;
-  allowedDevices: number;
+  allowedDevices: number | null;
   renewalAvailable: boolean;
 }
 
@@ -110,7 +116,7 @@ export interface NormalizedSubscription {
   remainingBytes: number | null;
   startsAt: string | null;
   expiresAt: string | null;
-  allowedDevices: number;
+  allowedDevices: number | null;
   locations: string[];
   lastSyncedAt: string;
   renewalInfo?: {
@@ -171,4 +177,12 @@ export interface AdapterHealthSummary {
     status: IntegrationConnectionState;
     message: string;
   };
+}
+
+/** Account linked through a PasarGuard subscription link (login without password). */
+export interface LinkedAccount {
+  instanceId: string;
+  username: string;
+  /** Secret token from the subscription URL. Kept server-side only. */
+  subscriptionToken: string;
 }

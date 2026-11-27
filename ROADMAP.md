@@ -1,5 +1,7 @@
 # ASiS VPN — Phased Implementation Roadmap
 
+> The "Pending" labels below are the original plan. For what is actually built and verified, read `IMPLEMENTATION_STATUS.md` and `CHANGELOG.md` (steps 0.3.6 - 0.4.2 came after Phase 10).
+
 - **Phase 0 — Architecture & Specification Analysis** *(Completed in Turn 1)*
   - Requirement analysis, runtime feasibility split, documentation suite, and integration prerequisites.
 - **Phase 1 — Project Structure & Design System** *(Completed in Turn 1)*

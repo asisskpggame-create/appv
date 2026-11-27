@@ -37,7 +37,7 @@ function readStoredPalette(): ThemePalette {
 }
 
 function readStoredLocale(): LocaleCode {
-  if (typeof window === 'undefined') return 'en-US';
+  if (typeof window === 'undefined') return 'fa-IR';
   try {
     const raw = window.localStorage.getItem(LOCALE_STORAGE_KEY);
     if (raw === 'fa-IR' || raw === 'en-US') {
@@ -46,7 +46,7 @@ function readStoredLocale(): LocaleCode {
   } catch {
     // Ignore storage read errors
   }
-  return 'en-US';
+  return 'fa-IR';
 }
 
 function getSystemTheme(): ThemeMode {

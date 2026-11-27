@@ -55,6 +55,8 @@ export interface SessionStorageAdapter {
 
 export interface AuthClient {
   login(credentials: LoginCredentials, device: DeviceInfo): Promise<AuthSession>;
+  /** Sign in with a PasarGuard subscription link (no password). */
+  loginWithLink(link: string, device: DeviceInfo): Promise<AuthSession>;
   refresh(refreshToken: string, deviceId: string): Promise<AuthTokens>;
   logout(accessToken: string, deviceId: string): Promise<void>;
   requestPasswordRecovery(username: string): Promise<{ delegated: boolean; workflowMessage: string }>;

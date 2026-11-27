@@ -121,7 +121,7 @@ export function StatisticsView({
 
   const [granularity, setGranularity] = useState<TrafficGranularity>('7d');
   const [chartSource, setChartSource] = useState<TrafficChartSource>('server_authoritative');
-  const [chartMode, setChartMode] = useState<TrafficChartMode>('area');
+  const [chartMode, setChartMode] = useState<TrafficChartMode>('bar');
   const [recordedLocalPoints, setRecordedLocalPoints] = useState<TrafficHistoryPoint[]>(
     () => localTrafficHistory ?? [],
   );
@@ -422,9 +422,9 @@ export function StatisticsView({
               value={granularity}
               onChange={handleGranularityChange}
               options={[
-                { value: '24h', label: isFa ? '۲۴ ساعت' : '24h' },
-                { value: '7d', label: isFa ? '۷ روز' : '7d' },
-                { value: '30d', label: isFa ? '۳۰ روز' : '30d' },
+                { value: '24h', label: isFa ? 'روزانه' : '24h' },
+                { value: '7d', label: isFa ? 'هفتگی' : '7d' },
+                { value: '30d', label: isFa ? 'ماهانه' : '30d' },
               ]}
             />
 
@@ -555,6 +555,16 @@ export function StatisticsView({
                     margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
                     barGap={4}
                   >
+                    <defs>
+                      <linearGradient id={`${downloadGradId}-bar`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={downloadColor} stopOpacity={1} />
+                        <stop offset="100%" stopColor={downloadColor} stopOpacity={0.35} />
+                      </linearGradient>
+                      <linearGradient id={`${uploadGradId}-bar`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={uploadColor} stopOpacity={1} />
+                        <stop offset="100%" stopColor={uploadColor} stopOpacity={0.35} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid stroke={gridColor} strokeDasharray="3 3" vertical={false} />
                     <XAxis
                       dataKey="label"
@@ -579,16 +589,16 @@ export function StatisticsView({
                     <Bar
                       dataKey="downloadScaled"
                       name={isFa ? 'دانلود' : 'Download'}
-                      fill={downloadColor}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={24}
+                      fill={`url(#${downloadGradId}-bar)`}
+                      radius={[6, 6, 0, 0]}
+                      maxBarSize={22}
                     />
                     <Bar
                       dataKey="uploadScaled"
                       name={isFa ? 'آپلود' : 'Upload'}
-                      fill={uploadColor}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={24}
+                      fill={`url(#${uploadGradId}-bar)`}
+                      radius={[6, 6, 0, 0]}
+                      maxBarSize={22}
                     />
                   </BarChart>
                 )}

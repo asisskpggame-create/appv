@@ -32,7 +32,7 @@ export function ToggleSwitch({
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
       } ${
         checked
-          ? 'border-[var(--asis-primary)] bg-[var(--asis-primary)]'
+          ? 'border-[var(--asis-primary)] bg-[var(--asis-primary)] dark:shadow-[0_0_12px_rgba(var(--asis-glow-rgb),0.7)]'
           : 'border-[var(--asis-border-strong)] bg-[var(--asis-surface-2)]'
       }`}
     >

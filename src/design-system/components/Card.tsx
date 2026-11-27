@@ -24,9 +24,9 @@ export function Card({
 }: CardProps) {
   return (
     <div
-      className={`rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)] text-[var(--asis-text-primary)] ${
+      className={`asis-glass rounded-2xl border border-[var(--asis-border)] bg-[var(--asis-surface)] text-[var(--asis-text-primary)] dark:border-[var(--asis-primary-border)]/70 ${
         elevated
-          ? 'shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_1px_2px_rgba(11,17,32,0.04),0_20px_44px_-22px_rgba(var(--asis-glow-rgb),0.22)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_24px_52px_-20px_rgba(0,0,0,0.88)]'
+          ? 'shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_1px_2px_rgba(11,17,32,0.04),0_20px_44px_-22px_rgba(var(--asis-glow-rgb),0.22)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_26px_-8px_rgba(var(--asis-glow-rgb),0.4)]'
           : 'shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(11,17,32,0.03)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.035),0_2px_10px_rgba(0,0,0,0.38)]'
       } ${
         interactive

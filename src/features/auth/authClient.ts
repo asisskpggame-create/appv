@@ -90,19 +90,27 @@ export class HttpAuthClient implements AuthClient {
   }
 
   async login(credentials: LoginCredentials, device: DeviceInfo): Promise<AuthSession> {
+    return this.postSession('/auth/login', {
+      username: credentials.username.trim(),
+      password: credentials.password,
+      device,
+    });
+  }
+
+  async loginWithLink(link: string, device: DeviceInfo): Promise<AuthSession> {
+    return this.postSession('/auth/login-link', { link: link.trim(), device });
+  }
+
+  private async postSession(path: string, requestBody: Record<string, unknown>): Promise<AuthSession> {
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}/auth/login`, {
+      response = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: JSON.stringify({
-          username: credentials.username.trim(),
-          password: credentials.password,
-          device,
-        }),
+        body: JSON.stringify(requestBody),
       });
     } catch {
       throw new AuthClientError({

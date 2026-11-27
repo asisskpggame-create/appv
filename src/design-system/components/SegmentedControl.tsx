@@ -38,7 +38,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             className={`min-h-[34px] rounded-lg px-3 py-1 text-xs font-medium whitespace-nowrap shrink-0 transition-all duration-150 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--asis-primary)] ${
               active
-                ? 'bg-[var(--asis-surface)] text-[var(--asis-text-primary)] shadow-[0_1px_2px_rgba(11,17,32,0.08)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_4px_rgba(0,0,0,0.45)]'
+                ? 'bg-[var(--asis-surface)] text-[var(--asis-text-primary)] shadow-[0_1px_2px_rgba(11,17,32,0.08)] dark:bg-[var(--asis-primary)] dark:text-white dark:shadow-[0_0_14px_-2px_rgba(var(--asis-glow-rgb),0.8)]'
                 : 'text-[var(--asis-text-secondary)] hover:text-[var(--asis-text-primary)]'
             }`}
           >

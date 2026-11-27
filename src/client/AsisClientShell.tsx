@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { clearEndpointLinks } from '../engine/endpointLinks';
 import {
   BarChart3,
   ChevronRight,
@@ -12,25 +13,38 @@ import {
   User,
 } from 'lucide-react';
 import { usePreferences } from '../design-system/ThemeContext';
+import { tapHaptic } from './haptics';
 import { BrandLogo, Button, SegmentedControl, ThemePaletteSwitcher } from '../design-system/components';
 import {
   AsisVpnEngineAdapter,
   type AdvancedConnectionPolicy,
 } from '../engine';
 import type { AuthSession } from '../features/auth';
-import { AccountView } from '../features/account/AccountView';
 import { HomeView } from '../features/home/HomeView';
 import {
   ServersView,
   type CustomServerEntry,
   type ProbeResultEntry,
   type ServerCatalogEntry,
+  buildServerCatalogFromSubscriptions,
+  probeFromPhone,
 } from '../features/servers';
-import { SettingsView } from '../features/settings';
-import { StatisticsView } from '../features/statistics';
-import { SubscriptionsView, type SubscriptionRecord } from '../features/subscriptions';
-import { SupportView } from '../features/support/SupportView';
-import { GatewayStatusView } from '../features/gateway/GatewayStatusView';
+import { loadLastServerId, saveLastServerId } from '../features/home/autoConnect';
+import {
+  SubscriptionsView,
+  fetchAccountSubscriptions,
+  type SubscriptionRecord,
+} from '../features/subscriptions';
+import { LazyScreen } from './LazyScreen';
+
+// Screens opened less often load on demand (the statistics screen brings the charts library with it).
+const AccountView = lazy(() => import('../features/account/AccountView').then((m) => ({ default: m.AccountView })));
+const SettingsView = lazy(() => import('../features/settings').then((m) => ({ default: m.SettingsView })));
+const StatisticsView = lazy(() => import('../features/statistics').then((m) => ({ default: m.StatisticsView })));
+const SupportView = lazy(() => import('../features/support/SupportView').then((m) => ({ default: m.SupportView })));
+const GatewayStatusView = lazy(() =>
+  import('../features/gateway/GatewayStatusView').then((m) => ({ default: m.GatewayStatusView })),
+);
 
 type ClientScreen =
   | 'home'
@@ -51,6 +65,8 @@ const DEFAULT_POLICY: AdvancedConnectionPolicy = {
   ipv6Mode: 'auto',
   mtu: 1400,
   autoReconnect: true,
+  autoSwitch: false,
+  autoConnect: false,
   connectionTimeoutSec: 15,
   protocolPreference: 'auto',
   routingMode: 'rule',
@@ -110,9 +126,64 @@ export function AsisClientShell() {
   const { locale, setLocale, dir } = usePreferences();
   const isFa = locale === 'fa-IR';
 
-  const [screen, setScreen] = useState<ClientScreen>('home');
+  const [screen, setScreenRaw] = useState<ClientScreen>('home');
+  const screenRef = useRef<ClientScreen>('home');
+
+  // Every in-app navigation is a history entry, so the Android back button
+  // (and the browser back button) returns to the previous screen instead of
+  // closing the app. Back from the first screen still exits.
+  const setScreen = useCallback((next: ClientScreen) => {
+    if (next === screenRef.current) return;
+    screenRef.current = next;
+    try {
+      window.history.pushState({ asisScreen: next }, '');
+    } catch {
+      // History API unavailable: fall back to plain state navigation.
+    }
+    setScreenRaw(next);
+    tapHaptic();
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.history.replaceState({ asisScreen: 'home' }, '');
+    } catch {
+      // Ignore.
+    }
+    const onPop = (event: PopStateEvent) => {
+      const stored = (event.state as { asisScreen?: ClientScreen } | null)?.asisScreen;
+      const target: ClientScreen = stored ?? 'home';
+      screenRef.current = target;
+      setScreenRaw(target);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
+
+  // Account subscriptions (and their servers) load automatically after sign-in
+  // and disappear on sign-out. Keyed by user + device, not by the rotating access token.
+  const signedInUserId = authSession?.user.id ?? null;
+  const signedInDeviceId = authSession?.deviceId ?? null;
+  useEffect(() => {
+    if (!signedInUserId) {
+      clearEndpointLinks();
+      setSubscriptions((prev) => (prev.some((s) => s.source === 'account') ? prev.filter((s) => s.source !== 'account') : prev));
+      return;
+    }
+    const accessToken = authSession?.tokens.accessToken;
+    if (!accessToken) return;
+    let cancelled = false;
+    void fetchAccountSubscriptions(accessToken).then((result) => {
+      if (cancelled || !result.ok) return;
+      setSubscriptions((prev) => [...result.subscriptions, ...prev.filter((s) => s.source !== 'account')]);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedInUserId, signedInDeviceId]);
   const [customServers, setCustomServers] = useState<CustomServerEntry[]>(() =>
     loadStoredCustomServers(),
   );
@@ -121,6 +192,8 @@ export function AsisClientShell() {
   const [probeResults, setProbeResults] = useState<Record<string, ProbeResultEntry>>({});
   const [probingIds, setProbingIds] = useState<Set<string>>(() => new Set());
   const [policy, setPolicy] = useState<AdvancedConnectionPolicy>(() => loadStoredPolicy());
+  // Auto-connect is armed once per app launch and consumed by the first attempt or by any user action.
+  const [autoConnectPending, setAutoConnectPending] = useState(true);
 
   const handleProbeServers = async (targets: ServerCatalogEntry[]) => {
     const validTargets = targets.filter(
@@ -136,11 +209,40 @@ export function AsisClientShell() {
     });
 
     try {
+      // Inside the Android app, measure from the phone itself (the network that actually
+      // has to reach the server); in a browser fall back to the gateway probe below.
+      const phoneResults = await probeFromPhone(
+        validTargets.map((t) => ({ id: t.id, host: t.probeHost as string, port: t.port ?? 443 })),
+      );
+      if (phoneResults) {
+        const measuredAt = new Date().toISOString();
+        setProbeResults((prev) => {
+          const next = { ...prev };
+          for (const item of phoneResults) {
+            next[item.id] = {
+              latencyMs: item.latencyMs,
+              available: item.available,
+              error: item.error,
+              measuredAt,
+              source: 'phone_tcp_probe',
+            };
+          }
+          return next;
+        });
+        return;
+      }
+
       for (let i = 0; i < validTargets.length; i += 15) {
         const chunk = validTargets.slice(i, i + 15);
         const res = await fetch('/api/v1/servers/probe', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...(authSession?.tokens?.accessToken
+              ? { Authorization: `Bearer ${authSession.tokens.accessToken}` }
+              : {}),
+          },
           body: JSON.stringify({
             targets: chunk.map((t) => ({
               id: t.id,
@@ -192,9 +294,26 @@ export function AsisClientShell() {
       ...selectedServer,
       available: selectedServer.supported ? probe.available : false,
       probeLatencyMs: selectedServer.supported ? probe.latencyMs : null,
-      measurementSource: selectedServer.supported ? ('gateway_tcp_probe' as const) : ('unsupported_protocol' as const),
+      measurementSource: selectedServer.supported
+        ? (probe.source ?? ('gateway_tcp_probe' as const))
+        : ('unsupported_protocol' as const),
     };
   }, [selectedServer, probeResults]);
+
+  // Servers the core may switch between in auto mode: the selected server's subscription,
+  // supported and not known-unreachable, best measured latency first (ping is the entry hop).
+  const autoSwitchCandidates = useMemo(() => {
+    if (!hydratedSelectedServer) return [];
+    const catalog = buildServerCatalogFromSubscriptions(subscriptions, customServers, probeResults);
+    return catalog
+      .filter(
+        (s) =>
+          s.supported &&
+          s.available !== false &&
+          s.subscriptionId === hydratedSelectedServer.subscriptionId,
+      )
+      .sort((a, b) => (a.probeLatencyMs ?? Infinity) - (b.probeLatencyMs ?? Infinity));
+  }, [hydratedSelectedServer, subscriptions, customServers, probeResults]);
 
   const handleAddCustomServers = (entries: CustomServerEntry[]) => {
     setCustomServers((prev) => {
@@ -223,6 +342,28 @@ export function AsisClientShell() {
     }
   };
 
+  // Auto-connect only makes sense right after launch: disarm if the server list never becomes ready.
+  useEffect(() => {
+    const timer = setTimeout(() => setAutoConnectPending(false), 20000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Remember the last chosen server so auto-connect can pick it again after a restart.
+  useEffect(() => {
+    if (selectedServer) saveLastServerId(selectedServer.id);
+  }, [selectedServer?.id]);
+
+  // Cold start: re-select the last used server as soon as the catalog has it (account sync is async).
+  useEffect(() => {
+    if (!policy.autoConnect || !autoConnectPending || selectedServer) return;
+    const lastId = loadLastServerId();
+    if (!lastId) return;
+    const found = buildServerCatalogFromSubscriptions(subscriptions, customServers, probeResults).find(
+      (s) => s.id === lastId && s.supported,
+    );
+    if (found) setSelectedServer(found);
+  }, [policy.autoConnect, autoConnectPending, selectedServer, subscriptions, customServers, probeResults]);
+
   const handlePolicyChange = (next: AdvancedConnectionPolicy) => {
     setPolicy(next);
     try {
@@ -246,9 +387,9 @@ export function AsisClientShell() {
     icon: React.ComponentType<{ className?: string }>;
   }> = [
     { id: 'home', labelEn: 'Home', labelFa: 'خانه', icon: Home },
-    { id: 'locations', labelEn: 'Locations', labelFa: 'مکان‌ها', icon: MapPin },
+    { id: 'locations', labelEn: 'Locations', labelFa: 'سرورها', icon: MapPin },
     { id: 'subscriptions', labelEn: 'Subscriptions', labelFa: 'اشتراک‌ها', icon: Layers },
-    { id: 'statistics', labelEn: 'Statistics', labelFa: 'آمار و پروتکل', icon: BarChart3 },
+    { id: 'statistics', labelEn: 'Statistics', labelFa: 'آمار', icon: BarChart3 },
   ];
 
   const secondaryNav: Array<{
@@ -264,6 +405,9 @@ export function AsisClientShell() {
   ];
 
   const allNav = [...primaryNav, ...secondaryNav];
+  // Phone bottom bar follows the design: Home, Servers, Stats, Account, Settings.
+  const MOBILE_NAV_IDS: ClientScreen[] = ['home', 'locations', 'statistics', 'account', 'settings'];
+  const mobileNav = MOBILE_NAV_IDS.map((id) => allNav.find((n) => n.id === id)!).filter(Boolean);
   const currentNav = allNav.find((n) => n.id === screen) ?? primaryNav[0];
 
   const renderNavButton = (item: (typeof allNav)[number]) => {
@@ -356,11 +500,11 @@ export function AsisClientShell() {
       </aside>
 
       {/* Main Viewport */}
-      <div className="asis-canvas-ambient flex flex-1 flex-col min-w-0 pb-16 md:pb-0">
+      <div className="asis-canvas-ambient flex flex-1 flex-col min-w-0 pb-24 md:pb-0">
         {/* Top Bar */}
         <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-[var(--asis-border)] bg-[var(--asis-chrome)]/85 px-6 py-3.5 backdrop-blur-md">
           <div className="flex items-center gap-3 min-w-0">
-            <BrandLogo className="w-6 h-6 md:hidden shrink-0" />
+            <BrandLogo glow className="w-7 h-7 md:hidden shrink-0" />
             <div className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
               <currentNav.icon className="w-4 h-4" aria-hidden="true" />
             </div>
@@ -403,6 +547,9 @@ export function AsisClientShell() {
                 policy={policy}
                 activeSubscription={activeSubscription}
                 selectedServer={hydratedSelectedServer}
+                autoSwitchCandidates={autoSwitchCandidates}
+                autoConnectPending={policy.autoConnect === true && autoConnectPending}
+                onAutoConnectHandled={() => setAutoConnectPending(false)}
                 probingSelectedServer={
                   hydratedSelectedServer ? probingIds.has(hydratedSelectedServer.id) : false
                 }
@@ -423,6 +570,7 @@ export function AsisClientShell() {
                 onRemoveCustomServer={handleRemoveCustomServer}
                 selectedServerId={selectedServer?.id ?? null}
                 onSelectServer={(srv) => {
+                  setAutoConnectPending(false);
                   setSelectedServer(srv);
                   if (srv.probeLatencyMs === null && srv.probeHost && srv.port) {
                     void handleProbeServers([srv]);
@@ -443,41 +591,44 @@ export function AsisClientShell() {
               />
             )}
 
-            {screen === 'statistics' && (
-              <StatisticsView
-                session={authSession}
-                activeSubscription={activeSubscription}
-                engineStats={engine.getConnectionStatistics()}
-              />
-            )}
+            <LazyScreen screen={screen}>
+              {screen === 'statistics' && (
+                <StatisticsView
+                  session={authSession}
+                  activeSubscription={activeSubscription}
+                  engineStats={engine.getConnectionStatistics()}
+                />
+              )}
 
-            {screen === 'account' && (
-              <AccountView
-                session={authSession}
-                onSessionChange={setAuthSession}
-                onNavigateToSubscriptions={() => setScreen('subscriptions')}
-              />
-            )}
+              {screen === 'account' && (
+                <AccountView
+                  session={authSession}
+                  onSessionChange={setAuthSession}
+                  onNavigateToSubscriptions={() => setScreen('subscriptions')}
+                />
+              )}
 
-            {screen === 'settings' && (
-              <SettingsView
-                platform={engine.platform}
-                policy={policy}
-                onPolicyChange={handlePolicyChange}
-                loadInstalledApplications={() => engine.getInstalledApplications()}
-              />
-            )}
+              {screen === 'settings' && (
+                <SettingsView
+                  platform={engine.platform}
+                  policy={policy}
+                  onPolicyChange={handlePolicyChange}
+                  loadInstalledApplications={() => engine.getInstalledApplications()}
+                  onNavigateToSupport={() => setScreen('support')}
+                />
+              )}
 
-            {screen === 'support' && (
-              <SupportView
-                engine={engine}
-                session={authSession}
-                activeSubscription={activeSubscription}
-                selectedServer={selectedServer}
-              />
-            )}
+              {screen === 'support' && (
+                <SupportView
+                  engine={engine}
+                  session={authSession}
+                  activeSubscription={activeSubscription}
+                  selectedServer={selectedServer}
+                />
+              )}
 
-            {screen === 'gateway' && <GatewayStatusView />}
+              {screen === 'gateway' && <GatewayStatusView />}
+            </LazyScreen>
           </div>
         </main>
       </div>
@@ -485,24 +636,36 @@ export function AsisClientShell() {
       {/* Mobile Bottom Navigation */}
       <nav
         aria-label="Mobile Navigation"
-        className="fixed bottom-0 inset-x-0 z-40 flex md:hidden items-center justify-around border-t border-[var(--asis-border)] bg-[var(--asis-chrome)]/95 px-1 py-1.5 backdrop-blur-md"
+        className="asis-glass fixed bottom-0 inset-x-0 z-40 flex md:hidden items-stretch justify-around rounded-t-3xl border-t border-[var(--asis-primary-border)] bg-[var(--asis-chrome)]/95 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-12px_rgba(var(--asis-glow-rgb),0.45)] backdrop-blur-xl"
       >
-        {allNav.slice(0, 6).map((item) => {
+        {mobileNav.map((item) => {
           const Icon = item.icon;
           const active = screen === item.id;
           return (
             <button
               key={item.id}
               type="button"
+              aria-current={active ? 'page' : undefined}
               onClick={() => setScreen(item.id)}
-              className={`flex flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1 text-[10px] font-medium cursor-pointer ${
+              className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[11px] font-medium transition-colors duration-150 cursor-pointer ${
                 active
-                  ? 'text-[var(--asis-accent-fg)]'
+                  ? 'text-[var(--asis-accent-fg)] asis-neon-text'
                   : 'text-[var(--asis-text-secondary)]'
               }`}
             >
-              <Icon className="w-4 h-4" aria-hidden="true" />
-              <span className="truncate max-w-[54px]">{isFa ? item.labelFa : item.labelEn}</span>
+              <Icon
+                className={`w-5 h-5 transition-transform duration-150 ${
+                  active ? 'scale-110 drop-shadow-[0_0_8px_rgba(var(--asis-glow-rgb),0.9)]' : ''
+                }`}
+                aria-hidden="true"
+              />
+              <span className="truncate max-w-[64px]">{isFa ? item.labelFa : item.labelEn}</span>
+              {active && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -top-2 h-0.5 w-8 rounded-full bg-[var(--asis-primary)] shadow-[0_0_10px_rgba(var(--asis-glow-rgb),0.9)]"
+                />
+              )}
             </button>
           );
         })}

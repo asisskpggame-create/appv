@@ -114,7 +114,7 @@ export const serverTranslations: Record<LocaleCode, ServerTranslations> = {
     emptyAction: 'Go to Subscriptions',
     icmpVsTunnelTitle: 'Honest Latency & Availability Notice',
     icmpVsTunnelBody:
-      'Click "Test Ping" to run real SSRF-guarded TCP reachability probes from the ASiS gateway (distinct from native client tunnel RTT).',
+      'In the Android app, "Test Ping" measures the TCP handshake time from this phone to each server, even while connected. In a browser it falls back to the ASiS gateway. For tunnel servers this is the entry hop only; it is not the end-to-end tunnel latency.',
     reasonMessages: {
       SELECTED_BY_MEASURED_LATENCY: 'Selected lowest measured latency compatible server.',
       SELECTED_COMPATIBLE_NO_LATENCY:
@@ -186,7 +186,7 @@ export const serverTranslations: Record<LocaleCode, ServerTranslations> = {
     emptyAction: 'رفتن به بخش اشتراک‌ها',
     icmpVsTunnelTitle: 'شفافیت سنجش پینگ و دسترس‌پذیری',
     icmpVsTunnelBody:
-      'با کلیک روی «تست پینگ»، درگاه ASiS اتصال TCP واقعی به سرور را می‌سنجد (پینگ از مسیر سرور درگاه است و با تاخیر تونل مستقیم روی گوشی/ویندوز متفاوت است).',
+      'در اپ اندروید، «تست پینگ» زمان اتصال TCP را از خود گوشی تا هر سرور می‌سنجد، حتی وقتی وصل هستید. در مرورگر از درگاه ASiS سنجیده می‌شود. برای سرورهای تانلی این عدد فقط تا سرور ورودی است و تأخیر کل تانل نیست.',
     reasonMessages: {
       SELECTED_BY_MEASURED_LATENCY: 'سازگارترین سرور با کمترین تاخیر اندازه‌گیری‌شده انتخاب شد.',
       SELECTED_COMPATIBLE_NO_LATENCY:

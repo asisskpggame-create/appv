@@ -94,6 +94,7 @@ export function ServersView({
   const [countryFilter, setCountryFilter] = useState<string>('ALL');
   const [protocolFilter, setProtocolFilter] = useState<string>('ALL');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [pendingServerId, setPendingServerId] = useState<string | null>(selectedServerId);
   const [sortMode, setSortMode] = useState<SortMode>('default');
 
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(
@@ -481,6 +482,18 @@ export function ServersView({
         />
       ) : (
         <div className="space-y-4">
+          <div className="md:hidden">
+            <SegmentedControl<'all' | 'favorites'>
+              ariaLabel={isFa ? 'فیلتر سرورها' : 'Server filter'}
+              value={favoritesOnly ? 'favorites' : 'all'}
+              onChange={(v) => setFavoritesOnly(v === 'favorites')}
+              options={[
+                { value: 'all', label: isFa ? 'همه کشورها' : 'All countries' },
+                { value: 'favorites', label: isFa ? 'علاقه‌مندی‌ها' : 'Favorites' },
+              ]}
+            />
+          </div>
+
           <Card className="grid grid-cols-1 gap-4 md:grid-cols-12 items-end">
             <div className="md:col-span-4">
               <Input
@@ -558,7 +571,82 @@ export function ServersView({
               }}
             />
           ) : (
-            <Card padding="none" className="overflow-x-auto">
+            <>
+            {/* Mobile: tappable server cards (matches the phone design) */}
+            <ul className="space-y-2.5 md:hidden" aria-label={t.title}>
+              {filteredServers.map((srv) => {
+                const isFavorite = favoriteIds.has(srv.id);
+                const isPending = pendingServerId === srv.id;
+                const localizedCountry = resolveCountryByCode(srv.countryCode);
+                const countryDisplay = isFa
+                  ? (localizedCountry?.nameFa ?? srv.countryName)
+                  : (localizedCountry?.nameEn ?? srv.countryName);
+                return (
+                  <li key={srv.id}>
+                    <div
+                      className={`asis-glass flex items-center gap-3 rounded-2xl border px-3.5 py-3 transition-all duration-150 ${
+                        isPending
+                          ? 'border-[var(--asis-primary)] shadow-[0_0_20px_-4px_rgba(var(--asis-glow-rgb),0.7)]'
+                          : 'border-[var(--asis-border)]'
+                      } ${srv.supported ? '' : 'opacity-60'}`}
+                    >
+                      <button
+                        type="button"
+                        disabled={!srv.supported}
+                        aria-pressed={isPending}
+                        onClick={() => setPendingServerId(srv.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-start cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <CountryFlag code={srv.countryCode} emoji={srv.countryFlag} className="w-9 h-9 shrink-0 rounded-full" />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold">
+                            {srv.name}
+                          </span>
+                          <span className="mt-0.5 flex items-center gap-2 text-xs text-[var(--asis-text-secondary)]">
+                            <span className="truncate">{countryDisplay ?? srv.protocol}</span>
+                            <LatencyIndicator
+                              latencyMs={srv.probeLatencyMs}
+                              available={srv.available}
+                              probing={probingIds.has(srv.id)}
+                              isFa={isFa}
+                            />
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={isFa ? 'علاقه‌مندی' : 'Toggle favorite'}
+                        aria-pressed={isFavorite}
+                        onClick={() => handleToggleFavorite(srv.id)}
+                        className={`shrink-0 p-1.5 cursor-pointer transition-transform duration-150 active:scale-90 ${
+                          isFavorite ? 'text-[#FBBF24]' : 'text-[var(--asis-border-strong)]'
+                        }`}
+                      >
+                        <Star className="w-5 h-5" fill={isFavorite ? 'currentColor' : 'none'} />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Sticky connect action above the bottom tab bar */}
+            <div className="sticky bottom-24 z-20 md:hidden">
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
+                disabled={!pendingServerId || !filteredServers.some((s) => s.id === pendingServerId && s.supported)}
+                onClick={() => {
+                  const target = allServers.find((s) => s.id === pendingServerId);
+                  if (target) handleSelectServer(target);
+                }}
+              >
+                {isFa ? 'اتصال به سرور' : 'Connect to server'}
+              </Button>
+            </div>
+
+            <Card padding="none" className="hidden md:block overflow-x-auto">
               <table className="w-full text-start text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--asis-border)] text-xs text-[var(--asis-text-secondary)]">
@@ -601,7 +689,14 @@ export function ServersView({
                               />
                             </button>
                             <div className="min-w-0">
-                              <p className="font-medium truncate max-w-[240px]">{srv.name}</p>
+                              <p className="font-medium truncate max-w-[240px]">
+                                {srv.name}
+                                {srv.route === 'tunnel' && (
+                                  <span className="ms-2 rounded-md border border-[var(--asis-border)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--asis-accent-fg)]">
+                                    {srv.entryCountryCode ?? 'IR'} → {srv.countryCode ?? '?'}
+                                  </span>
+                                )}
+                              </p>
                               <p className="font-mono text-xs text-[var(--asis-text-secondary)]">
                                 {srv.isCustom ? t.customGroupLabel : srv.group} · {srv.hostRedacted}
                                 {srv.port ? `:${srv.port}` : ''}
@@ -699,6 +794,7 @@ export function ServersView({
                 </tbody>
               </table>
             </Card>
+            </>
           )}
         </div>
       )}

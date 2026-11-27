@@ -5,11 +5,19 @@ import { performance } from 'node:perf_hooks';
 import type { NextFunction, Request, Response } from 'express';
 import { GatewayError } from './errors.ts';
 
-// Ephemeral process-local fallback if ASIS_JWT_SECRET is not provided in environment.
-const SIGNING_SECRET =
-  process.env.ASIS_JWT_SECRET && process.env.ASIS_JWT_SECRET.length >= 16
-    ? process.env.ASIS_JWT_SECRET
-    : crypto.randomBytes(32).toString('hex');
+// ASIS_JWT_SECRET is mandatory in production (>= 32 chars). Outside production an ephemeral
+// process-local secret is used, which invalidates all tokens on every restart.
+function resolveSigningSecret(): string {
+  const configured = process.env.ASIS_JWT_SECRET?.trim() ?? '';
+  if (configured.length >= 32) return configured;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('ASIS_JWT_SECRET must be set to a random value of at least 32 characters in production.');
+  }
+  console.warn('[security] ASIS_JWT_SECRET missing or too short; using an ephemeral dev secret.');
+  return crypto.randomBytes(32).toString('hex');
+}
+
+const SIGNING_SECRET = resolveSigningSecret();
 
 export interface AccessTokenClaims {
   sub: string;
@@ -61,6 +69,16 @@ export function verifyAccessToken(token: string): AccessTokenClaims {
   }
 
   const [header, body, providedSig] = parts;
+
+  try {
+    const parsedHeader = JSON.parse(base64UrlDecode(header)) as { alg?: unknown };
+    if (parsedHeader.alg !== 'HS256') {
+      throw new Error('unsupported alg');
+    }
+  } catch {
+    throw new GatewayError(401, 'AUTH_INVALID_TOKEN', 'session_expired', 'Unsupported token header.');
+  }
+
   const expectedSig = crypto
     .createHmac('sha256', SIGNING_SECRET)
     .update(`${header}.${body}`)
@@ -79,7 +97,15 @@ export function verifyAccessToken(token: string): AccessTokenClaims {
     throw new GatewayError(401, 'AUTH_INVALID_TOKEN', 'session_expired', 'Unable to decode token claims.');
   }
 
-  if (claims.tokenType !== 'access' || !claims.sub || !claims.deviceId) {
+  if (
+    !claims ||
+    claims.tokenType !== 'access' ||
+    typeof claims.sub !== 'string' ||
+    !claims.sub ||
+    typeof claims.deviceId !== 'string' ||
+    !claims.deviceId ||
+    typeof claims.exp !== 'number'
+  ) {
     throw new GatewayError(401, 'AUTH_INVALID_TOKEN', 'session_expired', 'Invalid token claim structure.');
   }
 
@@ -94,35 +120,71 @@ export function hashOpaqueSecret(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-function isPrivateOrLoopbackIPv4(ip: string): boolean {
-  const octets = ip.split('.').map(Number);
-  if (octets.length !== 4 || octets.some((n) => Number.isNaN(n) || n < 0 || n > 255)) {
-    return true;
+const BLOCKED_IPV4_CIDRS: Array<[string, number]> = [
+  ['0.0.0.0', 8], // "this" network
+  ['10.0.0.0', 8], // private
+  ['100.64.0.0', 10], // CGNAT
+  ['127.0.0.0', 8], // loopback
+  ['169.254.0.0', 16], // link-local / cloud metadata
+  ['172.16.0.0', 12], // private
+  ['192.0.0.0', 24], // IETF protocol assignments
+  ['192.0.2.0', 24], // TEST-NET-1
+  ['192.168.0.0', 16], // private
+  ['198.18.0.0', 15], // benchmarking
+  ['198.51.100.0', 24], // TEST-NET-2
+  ['203.0.113.0', 24], // TEST-NET-3
+  ['224.0.0.0', 4], // multicast
+  ['240.0.0.0', 4], // reserved + broadcast
+];
+
+const BLOCKED_IPV6_CIDRS: Array<[string, number]> = [
+  ['::', 128], // unspecified
+  ['::1', 128], // loopback
+  ['64:ff9b::', 96], // NAT64 (can embed private IPv4)
+  ['100::', 64], // discard-only
+  ['2001:db8::', 32], // documentation
+  ['2002::', 16], // 6to4 (can embed private IPv4)
+  ['fc00::', 7], // unique local
+  ['fe80::', 10], // link-local
+  ['ff00::', 8], // multicast
+];
+
+const blockList = new net.BlockList();
+for (const [addr, prefix] of BLOCKED_IPV4_CIDRS) blockList.addSubnet(addr, prefix, 'ipv4');
+for (const [addr, prefix] of BLOCKED_IPV6_CIDRS) blockList.addSubnet(addr, prefix, 'ipv6');
+
+/** Extracts the IPv4 part of an IPv4-mapped IPv6 address (::ffff:a.b.c.d or ::ffff:xxxx:xxxx). */
+function unmapIPv4(ip: string): string | null {
+  const lower = ip.toLowerCase();
+  const dotted = /^(?:0{0,4}:){0,5}(?:0{0,4}:)?ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(lower);
+  if (dotted) return dotted[1];
+  const hex = /^(?:0{0,4}:){0,5}(?:0{0,4}:)?ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(lower);
+  if (hex) {
+    const hi = Number.parseInt(hex[1], 16);
+    const lo = Number.parseInt(hex[2], 16);
+    return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
   }
-  const [a, b] = octets;
-  if (a === 10) return true; // 10.0.0.0/8
-  if (a === 127) return true; // 127.0.0.0/8 loopback
-  if (a === 0) return true; // 0.0.0.0/8
-  if (a === 169 && b === 254) return true; // link-local / cloud metadata
-  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
-  if (a === 192 && b === 168) return true; // 192.168.0.0/16
-  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10
-  return false;
+  return null;
+}
+
+/** Returns true when the IP is private, loopback, link-local, reserved, or otherwise non-public. */
+export function isBlockedIp(ip: string): boolean {
+  const version = net.isIP(ip);
+  if (version === 4) return blockList.check(ip, 'ipv4');
+  if (version === 6) {
+    const mapped = unmapIPv4(ip);
+    if (mapped && net.isIP(mapped) === 4) return blockList.check(mapped, 'ipv4');
+    return blockList.check(ip, 'ipv6');
+  }
+  return true; // not a valid IP: fail closed
+}
+
+function isPrivateOrLoopbackIPv4(ip: string): boolean {
+  return isBlockedIp(ip);
 }
 
 function isPrivateOrLoopbackIPv6(ip: string): boolean {
-  const normalized = ip.toLowerCase();
-  return (
-    normalized === '::1' ||
-    normalized === '::' ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd') ||
-    normalized.startsWith('fe80') ||
-    normalized.startsWith('::ffff:127.') ||
-    normalized.startsWith('::ffff:10.') ||
-    normalized.startsWith('::ffff:192.168.') ||
-    normalized.startsWith('::ffff:169.254.')
-  );
+  return isBlockedIp(ip);
 }
 
 /**
@@ -138,6 +200,16 @@ export function validateSubscriptionImportUrl(rawUrl: string): URL {
       'SUBSCRIPTION_INVALID_URL',
       'invalid_configuration',
       'Subscription URL is malformed.',
+      'verify_url',
+    );
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new GatewayError(
+      400,
+      'SUBSCRIPTION_CREDENTIALS_IN_URL',
+      'invalid_configuration',
+      'Subscription URLs must not embed credentials.',
       'verify_url',
     );
   }
@@ -280,6 +352,15 @@ export async function measureTcpLatencyMs(
  */
 export function createRateLimiter(bucket: string, maxRequests: number, windowMs: number) {
   const hits = new Map<string, number[]>();
+
+  // Drop idle keys periodically so the map cannot grow without bound.
+  const sweeper = setInterval(() => {
+    const now = Date.now();
+    for (const [key, stamps] of hits) {
+      if (stamps.every((ts) => now - ts >= windowMs)) hits.delete(key);
+    }
+  }, Math.max(windowMs, 30_000));
+  sweeper.unref();
 
   return (req: Request, _res: Response, next: NextFunction) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';

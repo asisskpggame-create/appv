@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Compass,
+  LifeBuoy,
   Languages,
+  Moon,
+  Power,
+  Shuffle,
+  ShieldCheck,
   Network,
   RefreshCw,
   ServerCog,
@@ -35,6 +40,8 @@ interface SettingsViewProps {
   policy: AdvancedConnectionPolicy;
   onPolicyChange: (next: AdvancedConnectionPolicy) => void;
   loadInstalledApplications?: () => Promise<InstalledAppEntry[]>;
+  /** Optional shortcut to the support screen (phone bottom bar has no Support tab). */
+  onNavigateToSupport?: () => void;
 }
 
 interface AppUpdateResponse {
@@ -69,8 +76,9 @@ export function SettingsView({
   policy,
   onPolicyChange,
   loadInstalledApplications,
+  onNavigateToSupport,
 }: SettingsViewProps) {
-  const { locale, setLocale } = usePreferences();
+  const { locale, setLocale, themePreference, setThemePreference } = usePreferences();
   const isFa = locale === 'fa-IR';
   const isWeb = platform === 'web';
 
@@ -187,8 +195,124 @@ export function SettingsView({
         </div>
       </div>
 
+      {/* Quick settings list (phone design) */}
+      <Card padding="none" className="divide-y divide-[var(--asis-border)]">
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+          <span className="flex items-center gap-3 text-sm font-medium">
+            <Languages className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+            {isFa ? 'زبان برنامه' : 'Language'}
+          </span>
+          <SegmentedControl<LocaleCode>
+            ariaLabel="Language"
+            value={locale}
+            onChange={setLocale}
+            options={[
+              { value: 'fa-IR', label: 'فارسی' },
+              { value: 'en-US', label: 'English' },
+            ]}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+          <span className="flex items-center gap-3 text-sm font-medium">
+            <Moon className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+            {isFa ? 'تم برنامه' : 'Theme'}
+          </span>
+          <SegmentedControl<'dark' | 'light' | 'system'>
+            ariaLabel="Theme"
+            value={themePreference}
+            onChange={setThemePreference}
+            options={[
+              { value: 'dark', label: isFa ? 'تیره' : 'Dark' },
+              { value: 'light', label: isFa ? 'روشن' : 'Light' },
+              { value: 'system', label: isFa ? 'سیستم' : 'Auto' },
+            ]}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+          <span className="flex items-center gap-3 text-sm font-medium">
+            <Power className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+            {isFa ? 'اتصال خودکار' : 'Auto reconnect'}
+          </span>
+          <ToggleSwitch
+            ariaLabel={isFa ? 'اتصال خودکار' : 'Auto reconnect'}
+            checked={policy.autoReconnect}
+            onChange={(next) => onPolicyChange({ ...policy, autoReconnect: next })}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+          <span className="flex items-center gap-3 text-sm font-medium">
+            <Shuffle className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+            {isFa ? 'اتوسوییچ بین سرورها' : 'Auto-switch servers'}
+          </span>
+          <ToggleSwitch
+            ariaLabel={isFa ? 'اتوسوییچ بین سرورها' : 'Auto-switch servers'}
+            checked={policy.autoSwitch === true}
+            onChange={(next) => onPolicyChange({ ...policy, autoSwitch: next })}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+          <span className="flex items-center gap-3 text-sm font-medium">
+            <Power className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+            {isFa ? 'اتصال خودکار هنگام باز شدن اپ' : 'Connect when the app opens'}
+          </span>
+          <ToggleSwitch
+            ariaLabel={isFa ? 'اتصال خودکار هنگام باز شدن اپ' : 'Connect when the app opens'}
+            checked={policy.autoConnect === true}
+            onChange={(next) => onPolicyChange({ ...policy, autoConnect: next })}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+          <span className="flex items-center gap-3 text-sm font-medium">
+            <ShieldCheck className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+            Kill Switch
+          </span>
+          <ToggleSwitch
+            ariaLabel="Kill Switch"
+            checked={policy.killSwitch}
+            disabled={isWeb}
+            onChange={(next) => onPolicyChange({ ...policy, killSwitch: next })}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+          <span className="flex items-center gap-3 text-sm font-medium">
+            <Split className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+            Split Tunneling
+          </span>
+          <span className="font-mono text-xs text-[var(--asis-text-secondary)]">{splitModeSummary}</span>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+          <span className="flex items-center gap-3 text-sm font-medium">
+            <ServerCog className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+            {isFa ? 'DNS' : 'DNS'}
+          </span>
+          <span className="font-mono text-xs text-[var(--asis-text-secondary)]">
+            {policy.customDns || '1.1.1.1'}
+          </span>
+        </div>
+
+        {onNavigateToSupport && (
+          <button
+            type="button"
+            onClick={onNavigateToSupport}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-start cursor-pointer transition-colors hover:bg-[var(--asis-surface-2)]/70"
+          >
+            <span className="flex items-center gap-3 text-sm font-medium">
+              <LifeBuoy className="w-4 h-4 text-[var(--asis-accent-fg)]" aria-hidden="true" />
+              {isFa ? 'پشتیبانی و راهنما' : 'Support & Help'}
+            </span>
+          </button>
+        )}
+      </Card>
+
       {/* 3-Column Active Tunnel Policy Summary */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-3">
         <Card interactive padding="sm" className="space-y-1.5">
           <div className="flex items-center justify-between text-xs text-[var(--asis-text-secondary)]">
             <span>{isFa ? 'حالت مسیریابی' : 'Routing Mode'}</span>
@@ -445,6 +569,48 @@ export function SettingsView({
               checked={policy.autoReconnect}
               onChange={(autoReconnect) => onPolicyChange({ ...policy, autoReconnect })}
               ariaLabel="Automatic Reconnection"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 py-3.5 text-sm">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
+                <Shuffle className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium">{isFa ? 'اتوسوییچ بین سرورها' : 'Auto-switch servers'}</p>
+                <p className="text-xs text-[var(--asis-text-secondary)]">
+                  {isFa
+                    ? 'با اتصال به چند سرور اشتراک، سریع‌ترین مسیر (با تست واقعی از داخل تانل) خودکار انتخاب می‌شود'
+                    : 'Connects with several servers of the subscription and keeps the fastest one, measured through the tunnel'}
+                </p>
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={policy.autoSwitch === true}
+              onChange={(autoSwitch) => onPolicyChange({ ...policy, autoSwitch })}
+              ariaLabel="Auto-switch servers"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 py-3.5 text-sm">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--asis-primary-soft)] text-[var(--asis-accent-fg)]">
+                <Power className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium">{isFa ? 'اتصال خودکار هنگام باز شدن اپ' : 'Connect when the app opens'}</p>
+                <p className="text-xs text-[var(--asis-text-secondary)]">
+                  {isFa
+                    ? 'با باز کردن اپ، به آخرین سرور انتخابی وصل می‌شود. اولین اتصال را باید خودتان بزنید.'
+                    : 'Connects to your last server each time the app starts. The very first connection must be made manually.'}
+                </p>
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={policy.autoConnect === true}
+              onChange={(autoConnect) => onPolicyChange({ ...policy, autoConnect })}
+              ariaLabel="Connect when the app opens"
             />
           </div>
 

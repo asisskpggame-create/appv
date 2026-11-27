@@ -2,16 +2,17 @@ import React, { useId } from 'react';
 
 interface BrandLogoProps {
   className?: string;
+  glow?: boolean;
 }
 
-export function BrandLogo({ className = 'w-7 h-7' }: BrandLogoProps) {
+export function BrandLogo({ className = 'w-7 h-7', glow = false }: BrandLogoProps) {
   const gradId = useId();
   return (
     <svg
       viewBox="0 0 36 36"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={className}
+      className={`${className}${glow ? ' asis-logo-glow' : ''}`}
       aria-hidden="true"
     >
       <defs>

@@ -6,6 +6,8 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   hint?: string;
   allowPasswordToggle?: boolean;
+  /** Optional leading icon (e.g. user / lock). */
+  icon?: React.ReactNode;
   showPasswordLabel?: string;
   hidePasswordLabel?: string;
 }
@@ -16,6 +18,7 @@ export function Input({
   hint,
   type = 'text',
   allowPasswordToggle = false,
+  icon,
   showPasswordLabel = 'Show password',
   hidePasswordLabel = 'Hide password',
   className = '',
@@ -39,13 +42,18 @@ export function Input({
         {label}
       </label>
       <div className="relative">
+        {icon && (
+          <span className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3.5 text-[var(--asis-accent-fg)]">
+            {icon}
+          </span>
+        )}
         <input
           id={inputId}
           type={effectiveType}
           aria-invalid={Boolean(error)}
-          className={`w-full min-h-[42px] rounded-xl border bg-[var(--asis-surface)] px-3.5 py-2 text-sm text-[var(--asis-text-primary)] placeholder:text-[#94A3B8] transition-colors duration-150 focus:outline-none focus:ring-2 dark:bg-[var(--asis-bg)] dark:placeholder:text-[#64748B] ${
+          className={`w-full min-h-[42px] rounded-xl border bg-[var(--asis-surface)] px-3.5 py-2 text-sm text-[var(--asis-text-primary)] placeholder:text-[#94A3B8] transition-colors duration-150 focus:outline-none focus:ring-2 dark:bg-[var(--asis-primary-soft)]/70 dark:placeholder:text-[#64748B] ${
             isPasswordField ? 'pe-11' : ''
-          } ${
+          } ${icon ? 'ps-10' : ''} ${
             error
               ? 'border-[#DC2626] focus:ring-[#DC2626]/20 dark:border-[#EF4444]'
               : 'border-[var(--asis-border-strong)] focus:border-[var(--asis-primary)] focus:ring-[var(--asis-primary)]/20'

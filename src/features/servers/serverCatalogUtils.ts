@@ -106,6 +106,49 @@ export function inferCountryMetadata(nodeName: string): {
   return { countryCode: null, countryFlag: null, countryName: null };
 }
 
+export interface TunnelTag {
+  entryCountryCode: string;
+  exitCountryCode: string;
+  /** Server name with the tag removed. */
+  cleanName: string;
+}
+
+/**
+ * Detects an explicit tunnel marker in a server name / panel remark.
+ * Accepted forms (case-insensitive, brackets required):
+ *   [TUN IR>DE]   [TUNNEL IR->DE]   [TUN IR→DE]   [تانل IR>DE]
+ *   [TUN DE]      -> entry assumed to be IR
+ * Never guessed: no tag means a direct server.
+ */
+const TUNNEL_TAG_RE =
+  /\[\s*(?:TUN|TUNNEL|تانل)\s+(?:([A-Za-z]{2})\s*(?:->|=>|→|>)\s*)?([A-Za-z]{2})\s*\]/i;
+
+export function parseTunnelTag(name: string): TunnelTag | null {
+  const match = name.match(TUNNEL_TAG_RE);
+  if (!match) return null;
+  const entry = (match[1] ?? 'IR').toUpperCase();
+  const exit = match[2].toUpperCase();
+  const cleaned = name.replace(TUNNEL_TAG_RE, '').replace(/\s{2,}/g, ' ').trim();
+  return {
+    entryCountryCode: entry,
+    exitCountryCode: exit,
+    cleanName: cleaned || `${entry} → ${exit}`,
+  };
+}
+
+function exitCountryMetadata(code: string): {
+  countryCode: string;
+  countryFlag: string | null;
+  countryName: string;
+} {
+  const known = resolveCountryByCode(code);
+  return {
+    countryCode: code,
+    countryFlag: known?.flag ?? null,
+    countryName: known?.nameEn ?? code,
+  };
+}
+
 export function buildServerCatalogFromSubscriptions(
   subscriptions: SubscriptionRecord[],
   customServers: CustomServerEntry[] = [],
@@ -117,6 +160,7 @@ export function buildServerCatalogFromSubscriptions(
     const inferred = custom.countryCode
       ? resolveCountryByCode(custom.countryCode)
       : null;
+    const customTunnel = custom.route === 'tunnel' ? null : parseTunnelTag(custom.name);
     const probe = probeResults[custom.id];
     const available = !custom.supported
       ? false
@@ -127,17 +171,21 @@ export function buildServerCatalogFromSubscriptions(
     const measurementSource = !custom.supported
       ? 'unsupported_protocol'
       : probe
-        ? 'gateway_tcp_probe'
+        ? (probe.source ?? 'gateway_tcp_probe')
         : 'unavailable';
 
     entries.push({
       id: custom.id,
       subscriptionId: 'custom_locations',
       subscriptionName: 'Custom Locations',
-      name: custom.name,
-      countryCode: custom.countryCode,
-      countryFlag: custom.countryFlag ?? inferred?.flag ?? null,
-      countryName: custom.countryName ?? inferred?.nameEn ?? null,
+      name: customTunnel ? customTunnel.cleanName : custom.name,
+      countryCode: customTunnel ? customTunnel.exitCountryCode : custom.countryCode,
+      countryFlag: customTunnel
+        ? (resolveCountryByCode(customTunnel.exitCountryCode)?.flag ?? null)
+        : (custom.countryFlag ?? inferred?.flag ?? null),
+      countryName: customTunnel
+        ? (resolveCountryByCode(customTunnel.exitCountryCode)?.nameEn ?? customTunnel.exitCountryCode)
+        : (custom.countryName ?? inferred?.nameEn ?? null),
       city: null,
       group: 'Custom',
       protocol: custom.protocol,
@@ -149,6 +197,8 @@ export function buildServerCatalogFromSubscriptions(
       probeLatencyMs,
       measurementSource,
       isCustom: true,
+      route: custom.route === 'tunnel' || customTunnel ? 'tunnel' : 'direct',
+      entryCountryCode: customTunnel?.entryCountryCode ?? custom.entryCountryCode ?? null,
     });
   }
 
@@ -158,7 +208,10 @@ export function buildServerCatalogFromSubscriptions(
     }
 
     for (const ep of sub.endpoints) {
-      const country = inferCountryMetadata(ep.name);
+      const tunnel = parseTunnelTag(ep.name);
+      const country = tunnel
+        ? exitCountryMetadata(tunnel.exitCountryCode)
+        : inferCountryMetadata(ep.name);
       const id = `${sub.id}:${ep.id}`;
       const probe = probeResults[id];
       const available = !ep.supported
@@ -170,14 +223,14 @@ export function buildServerCatalogFromSubscriptions(
       const measurementSource = !ep.supported
         ? 'unsupported_protocol'
         : probe
-          ? 'gateway_tcp_probe'
+          ? (probe.source ?? 'gateway_tcp_probe')
           : 'unavailable';
 
       entries.push({
         id,
         subscriptionId: sub.id,
         subscriptionName: sub.name,
-        name: ep.name,
+        name: tunnel ? tunnel.cleanName : ep.name,
         countryCode: country.countryCode,
         countryFlag: country.countryFlag,
         countryName: country.countryName,
@@ -192,6 +245,8 @@ export function buildServerCatalogFromSubscriptions(
         probeLatencyMs,
         measurementSource,
         isCustom: false,
+        route: tunnel ? 'tunnel' : 'direct',
+        entryCountryCode: tunnel?.entryCountryCode ?? null,
       });
     }
   }

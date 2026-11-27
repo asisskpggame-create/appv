@@ -1,0 +1,26 @@
+{
+  "appId": "com.asisvpn.client",
+  "appName": "ASiS VPN",
+  "webDir": "dist",
+  "backgroundColor": "#030816",
+  "server": { "androidScheme": "https", "cleartext": true },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#030816",
+    "adjustMarginsForEdgeToEdge": "auto"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 900,
+      "launchAutoHide": true,
+      "backgroundColor": "#030816",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#030816",
+      "overlaysWebContent": false
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Lock, LogOut, ShieldCheck } from 'lucide-react';
+import { Link2, Lock, LogOut, ShieldCheck, User } from 'lucide-react';
 import { usePreferences } from '../../design-system/ThemeContext';
 import {
   BrandLogo,
@@ -7,6 +7,7 @@ import {
   Card,
   Dialog,
   Input,
+  SegmentedControl,
   StatusBanner,
 } from '../../design-system/components';
 import { authTranslations } from './authTranslations';
@@ -40,6 +41,9 @@ export function AuthForm({
   const client = useMemo(() => authClient ?? new HttpAuthClient('/api/v1'), [authClient]);
   const [deviceId] = useState(() => getOrCreateWebDeviceId());
 
+  const [mode, setMode] = useState<'link' | 'password'>('link');
+  const [link, setLink] = useState('');
+  const [linkTouched, setLinkTouched] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [touched, setTouched] = useState<{ username: boolean; password: boolean }>({
@@ -73,29 +77,48 @@ export function AuthForm({
   const showUsernameError = (touched.username || submittedOnce) ? fieldErrors.username : undefined;
   const showPasswordError = (touched.password || submittedOnce) ? fieldErrors.password : undefined;
 
+  const linkError = (() => {
+    const trimmed = link.trim();
+    if (!trimmed) return t.validationLinkRequired;
+    try {
+      return new URL(trimmed).protocol === 'https:' || new URL(trimmed).protocol === 'http:'
+        ? undefined
+        : t.validationLinkInvalid;
+    } catch {
+      return t.validationLinkInvalid;
+    }
+  })();
+  const showLinkError = linkTouched || submittedOnce ? linkError : undefined;
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setSubmittedOnce(true);
     setAuthError(null);
 
-    const validation = validateCredentials({ username, password }, t);
-    if (validation.username || validation.password) {
-      return;
+    if (mode === 'link') {
+      if (linkError) return;
+    } else {
+      const validation = validateCredentials({ username, password }, t);
+      if (validation.username || validation.password) {
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
-      const authenticated = await client.login(
-        { username: username.trim(), password },
-        {
-          deviceId,
-          deviceName: 'ASiS Web Workspace',
-          platform: 'web',
-          appVersion: '0.2.0',
-        },
-      );
-      // Clear password from React state immediately after authentication
+      const device = {
+        deviceId,
+        deviceName: 'ASiS Web Workspace',
+        platform: 'web' as const,
+        appVersion: '0.2.0',
+      };
+      const authenticated =
+        mode === 'link'
+          ? await client.loginWithLink(link.trim(), device)
+          : await client.login({ username: username.trim(), password }, device);
+      // Clear secrets from React state immediately after authentication
       setPassword('');
+      setLink('');
       setSession(authenticated);
       onAuthenticated?.(authenticated);
     } catch (err) {
@@ -163,6 +186,8 @@ export function AuthForm({
   };
 
   const renderErrorTitle = (err: AuthError): string => {
+    if (err.code.startsWith('AUTH_LINK')) return t.errorLinkTitle;
+    if (err.code === 'AUTH_ACCOUNT_LOCKED') return t.errorLockedTitle;
     switch (err.category) {
       case 'authentication_failure':
         return t.errorInvalidCredentialsTitle;
@@ -180,6 +205,8 @@ export function AuthForm({
   };
 
   const renderErrorBody = (err: AuthError): string => {
+    if (err.code.startsWith('AUTH_LINK')) return t.errorLinkBody;
+    if (err.code === 'AUTH_ACCOUNT_LOCKED') return t.errorLockedBody;
     switch (err.category) {
       case 'authentication_failure':
         return t.errorInvalidCredentialsBody;
@@ -243,15 +270,23 @@ export function AuthForm({
   }
 
   return (
-    <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 lg:grid-cols-12 items-start">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+      {/* Hero: glowing brand mark */}
+      <div className="flex flex-col items-center gap-3 pt-2 text-center">
+        <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-[var(--asis-primary-border)] bg-[var(--asis-primary-soft)]/60 shadow-[0_0_40px_-4px_rgba(var(--asis-glow-rgb),0.6)]">
+          <BrandLogo glow className="h-16 w-16" />
+        </div>
+        <p className="text-2xl font-bold tracking-tight asis-neon-text">ASiS VPN</p>
+        <h1 className="text-sm font-medium text-[var(--asis-text-secondary)]">
+          {locale === 'fa-IR' ? 'به دنیای آزاد متصل شوید' : 'Connect to the open world'}
+        </h1>
+      </div>
+
       {/* Primary Authentication Card */}
-      <Card elevated className="lg:col-span-7 space-y-6 text-start" padding="lg">
-        <div className="space-y-2 border-b border-[var(--asis-border)] pb-5">
-          <div className="flex items-center gap-3">
-            <BrandLogo className="w-8 h-8 shrink-0" />
-            <h1 className="text-xl font-bold tracking-tight">{t.screenTitle}</h1>
-          </div>
-          <p className="text-sm leading-relaxed text-[var(--asis-text-secondary)]">
+      <Card elevated className="space-y-5 text-start" padding="lg">
+        <div className="space-y-1">
+          <h2 className="text-lg font-bold tracking-tight">{t.screenTitle}</h2>
+          <p className="text-xs leading-relaxed text-[var(--asis-text-secondary)]">
             {t.screenSubtitle}
           </p>
         </div>
@@ -264,9 +299,50 @@ export function AuthForm({
           />
         )}
 
+        <SegmentedControl
+          ariaLabel={t.tabsAriaLabel}
+          value={mode}
+          onChange={(next) => {
+            setMode(next);
+            setAuthError(null);
+          }}
+          options={[
+            { value: 'link', label: t.tabLink },
+            { value: 'password', label: t.tabPassword },
+          ]}
+        />
+
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          {mode === 'link' && (
+            <Input
+              label={t.linkLabel}
+              icon={<Link2 className="w-4 h-4" aria-hidden="true" />}
+              name="subscription-link"
+              type="text"
+              inputMode="url"
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              dir="ltr"
+              placeholder={t.linkPlaceholder}
+              hint={t.linkHint}
+              value={link}
+              disabled={isLoading}
+              error={showLinkError}
+              onBlur={() => setLinkTouched(true)}
+              onChange={(e) => {
+                setLink(e.target.value);
+                if (authError) setAuthError(null);
+              }}
+            />
+          )}
+
+          {mode === 'password' && (
+          <>
           <Input
             label={t.usernameLabel}
+            icon={<User className="w-4 h-4" aria-hidden="true" />}
             name="username"
             autoComplete="username"
             placeholder={t.usernamePlaceholder}
@@ -283,6 +359,7 @@ export function AuthForm({
           <div className="space-y-1.5">
             <Input
               label={t.passwordLabel}
+              icon={<Lock className="w-4 h-4" aria-hidden="true" />}
               name="password"
               type="password"
               autoComplete="current-password"
@@ -299,7 +376,7 @@ export function AuthForm({
                 if (authError) setAuthError(null);
               }}
             />
-            <div className="flex justify-end">
+            <div className="flex justify-center pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -314,6 +391,8 @@ export function AuthForm({
               </button>
             </div>
           </div>
+          </>
+          )}
 
           <Button
             type="submit"
@@ -329,7 +408,7 @@ export function AuthForm({
       </Card>
 
       {/* Side Panel: Security Safeguards & Direct Subscription Import */}
-      <div className="lg:col-span-5 space-y-6 text-start">
+      <div className="space-y-6 text-start">
         <Card className="space-y-4">
           <div className="flex items-center gap-2.5 text-[var(--asis-accent-fg)]">
             <ShieldCheck className="w-5 h-5 shrink-0" aria-hidden="true" />
@@ -364,9 +443,9 @@ export function AuthForm({
           {onUseManualSubscription && (
             <div className="pt-1">
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
-                className="w-full"
+                className="w-full text-[var(--asis-accent-fg)]"
                 onClick={onUseManualSubscription}
               >
                 {locale === 'fa-IR'

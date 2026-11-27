@@ -119,6 +119,76 @@ function isProtocolSupportedOnPlatform(protocol: EngineProtocol, platform: Targe
 /**
  * Validates and converts a single URI or sing-box JSON outbound into a strict, injection-safe outbound AST.
  */
+
+type OutboundExtras = Record<string, unknown>;
+
+function buildTransport(params: URLSearchParams, transport: string): OutboundExtras {
+  const path = params.get('path') || '/';
+  const host = params.get('host') || '';
+  switch (transport) {
+    case 'ws':
+      return {
+        transport: {
+          type: 'ws',
+          path,
+          ...(host ? { headers: { Host: host } } : {}),
+        },
+      };
+    case 'grpc':
+      return { transport: { type: 'grpc', service_name: params.get('serviceName') || '' } };
+    case 'http':
+    case 'h2':
+      return {
+        transport: {
+          type: 'http',
+          path,
+          ...(host ? { host: host.split(',').map((h) => h.trim()).filter(Boolean) } : {}),
+        },
+      };
+    case 'httpupgrade':
+      return { transport: { type: 'httpupgrade', path, ...(host ? { host } : {}) } };
+    default:
+      return {};
+  }
+}
+
+function buildTls(params: URLSearchParams, host: string, security: string): OutboundExtras {
+  if (security !== 'tls' && security !== 'reality') return {};
+  const alpn = (params.get('alpn') || '').split(',').map((a) => a.trim()).filter(Boolean);
+  const fp = params.get('fp') || '';
+  const tls: Record<string, unknown> = {
+    enabled: true,
+    server_name: params.get('sni') || params.get('host') || host,
+    ...(alpn.length > 0 ? { alpn } : {}),
+    ...(params.get('allowInsecure') === '1' || params.get('insecure') === '1' ? { insecure: true } : {}),
+    ...(fp ? { utls: { enabled: true, fingerprint: fp } } : {}),
+  };
+  if (security === 'reality') {
+    tls.reality = {
+      enabled: true,
+      public_key: params.get('pbk') || '',
+      short_id: params.get('sid') || '',
+    };
+    if (!tls.utls) tls.utls = { enabled: true, fingerprint: 'chrome' };
+  }
+  return { tls };
+}
+
+function decodeShadowsocksUserinfo(url: URL): { method: string; password: string } | null {
+  const user = decodeURIComponent(url.username);
+  // SIP002: ss://base64(method:password)@host:port  or  ss://method:password@host:port
+  if (url.password) return { method: user, password: decodeURIComponent(url.password) };
+  try {
+    const padded = user.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4));
+    const idx = decoded.indexOf(':');
+    if (idx > 0) return { method: decoded.slice(0, idx), password: decoded.slice(idx + 1) };
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
 export function validateAndParseOutbound(
   rawInput: string,
   targetPlatform: TargetPlatform = 'web',
@@ -265,6 +335,24 @@ export function validateAndParseOutbound(
           server_port: port,
           uuid: decoded.id,
           security: 'auto',
+          alter_id: Number((decoded as { aid?: string | number }).aid ?? 0) || 0,
+          ...(decoded.tls === 'tls'
+            ? {
+                tls: {
+                  enabled: true,
+                  server_name:
+                    (decoded as { sni?: string }).sni || (decoded as { host?: string }).host || decoded.add,
+                },
+              }
+            : {}),
+          ...buildTransport(
+            new URLSearchParams({
+              path: (decoded as { path?: string }).path || '/',
+              host: (decoded as { host?: string }).host || '',
+              serviceName: (decoded as { path?: string }).path || '',
+            }),
+            (decoded.net || 'tcp').toLowerCase(),
+          ),
         },
       };
       return {
@@ -335,15 +423,10 @@ export function validateAndParseOutbound(
         tag: 'proxy',
         server: host,
         server_port: port,
-        uuid: url.username,
-        ...(security === 'tls' || security === 'reality'
-          ? {
-              tls: {
-                enabled: true,
-                server_name: url.searchParams.get('sni') || host,
-              },
-            }
-          : {}),
+        uuid: decodeURIComponent(url.username),
+        ...(url.searchParams.get('flow') ? { flow: url.searchParams.get('flow') } : {}),
+        ...buildTls(url.searchParams, host, security),
+        ...buildTransport(url.searchParams, transport),
       },
     };
     return {
@@ -377,8 +460,9 @@ export function validateAndParseOutbound(
         tag: 'proxy',
         server: host,
         server_port: port,
-        password: url.username,
-        tls: { enabled: true, server_name: url.searchParams.get('sni') || host },
+        password: decodeURIComponent(url.username),
+        ...buildTls(url.searchParams, host, security === 'reality' ? 'tls' : 'tls'),
+        ...buildTransport(url.searchParams, transport),
       },
     };
     return {
@@ -412,6 +496,90 @@ export function validateAndParseOutbound(
     };
   }
 
+  if (scheme === 'wg' || scheme === 'wireguard') {
+    return {
+      valid: false,
+      protocol: 'WireGuard',
+      supportedOnCurrentPlatform: false,
+      errors: ['WireGuard links are not converted yet: they need keys and a local address that a plain URI does not carry.'],
+    };
+  }
+
+  const params = url.searchParams;
+  const userRaw = decodeURIComponent(url.username);
+  const passRaw = decodeURIComponent(url.password);
+  const tlsForQuic = buildTls(params, host, 'tls');
+  let singBoxOutbound: Record<string, unknown>;
+
+  if (scheme === 'ss') {
+    const creds = decodeShadowsocksUserinfo(url);
+    if (!creds) {
+      return {
+        valid: false,
+        protocol: 'Shadowsocks',
+        supportedOnCurrentPlatform: false,
+        errors: ['Shadowsocks URI is missing method/password.'],
+      };
+    }
+    singBoxOutbound = {
+      type: 'shadowsocks',
+      tag: 'proxy',
+      server: host,
+      server_port: port,
+      method: creds.method,
+      password: creds.password,
+    };
+  } else if (scheme === 'hysteria2' || scheme === 'hy2') {
+    if (!userRaw) {
+      return {
+        valid: false,
+        protocol: 'Hysteria2',
+        supportedOnCurrentPlatform: false,
+        errors: ['Hysteria2 URI is missing the auth password.'],
+      };
+    }
+    singBoxOutbound = {
+      type: 'hysteria2',
+      tag: 'proxy',
+      server: host,
+      server_port: port,
+      password: passRaw ? `${userRaw}:${passRaw}` : userRaw,
+      ...tlsForQuic,
+      ...(params.get('obfs') === 'salamander' && params.get('obfs-password')
+        ? { obfs: { type: 'salamander', password: params.get('obfs-password') } }
+        : {}),
+    };
+  } else if (scheme === 'tuic') {
+    if (!userRaw || !passRaw) {
+      return {
+        valid: false,
+        protocol: 'TUIC',
+        supportedOnCurrentPlatform: false,
+        errors: ['TUIC URI needs uuid:password.'],
+      };
+    }
+    singBoxOutbound = {
+      type: 'tuic',
+      tag: 'proxy',
+      server: host,
+      server_port: port,
+      uuid: userRaw,
+      password: passRaw,
+      ...(params.get('congestion_control') ? { congestion_control: params.get('congestion_control') } : {}),
+      ...tlsForQuic,
+    };
+  } else {
+    // socks / socks5 / http
+    singBoxOutbound = {
+      type: scheme === 'http' ? 'http' : 'socks',
+      tag: 'proxy',
+      server: host,
+      server_port: port,
+      ...(userRaw ? { username: userRaw } : {}),
+      ...(passRaw ? { password: passRaw } : {}),
+    };
+  }
+
   const outbound: SanitizedOutboundConfig = {
     id: `${scheme}_${port}`,
     tag,
@@ -420,12 +588,7 @@ export function validateAndParseOutbound(
     port,
     transport: scheme === 'hysteria2' || scheme === 'hy2' || scheme === 'tuic' ? 'quic' : 'tcp',
     tlsSecurity: scheme === 'hysteria2' || scheme === 'hy2' || scheme === 'tuic' ? 'tls' : 'none',
-    singBoxOutbound: {
-      type: scheme === 'hy2' ? 'hysteria2' : scheme === 'ss' ? 'shadowsocks' : scheme,
-      tag: 'proxy',
-      server: host,
-      server_port: port,
-    },
+    singBoxOutbound,
   };
 
   return {

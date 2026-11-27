@@ -1,12 +1,22 @@
 import crypto from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { InMemoryGatewayStore } from './adapters/gatewayStore.ts';
+import type { GatewayStore } from './adapters/gatewayStore.ts';
+import { createGatewayStoreFromEnv } from './adapters/storeFactory.ts';
 import {
   loadPasarGuardRegistryFromEnv,
   type PasarGuardAdapterRegistry,
 } from './adapters/pasarguardAdapter.ts';
+import { createAdminRouter } from './adminRoutes.ts';
+import { authenticateLocalAccount, normalizeUsername, rejectUnknownUser } from './localAuth.ts';
 import { loadResellerAdapterFromEnv, type ResellerAdapter } from './adapters/resellerAdapter.ts';
 import { GatewayError } from './errors.ts';
+import {
+  authenticateWithLink,
+  getLinkedContext,
+  linksToServers,
+  recordToCustomerStatus,
+  recordToSubscription,
+} from './linkedAccount.ts';
 import { OPENAPI_SPEC } from './openapi.ts';
 import {
   assertSafeProbeTarget,
@@ -55,20 +65,21 @@ function compareSemver(a: string, b: string): number {
 export interface GatewayDependencies {
   pasarguard?: PasarGuardAdapterRegistry;
   reseller?: ResellerAdapter;
-  store?: InMemoryGatewayStore;
+  store?: GatewayStore;
 }
 
 export function createGatewayRouter(deps: GatewayDependencies = {}) {
   const router = express.Router();
   const pasarguard = deps.pasarguard ?? loadPasarGuardRegistryFromEnv();
   const reseller = deps.reseller ?? loadResellerAdapterFromEnv();
-  const store = deps.store ?? new InMemoryGatewayStore();
+  const store = deps.store ?? createGatewayStoreFromEnv();
 
   const authRateLimit = createRateLimiter('auth', 20, 60_000);
   const apiRateLimit = createRateLimiter('api', 120, 60_000);
 
   router.use(express.json({ limit: '64kb' }));
   router.use(apiRateLimit);
+  router.use('/admin', createAdminRouter({ store, pasarguard }));
 
   const requireAuth = (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     const header = req.headers.authorization;
@@ -103,6 +114,56 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
     } catch (err) {
       next(err);
     }
+  };
+
+  // Registers the device and issues the token pair (shared by password and link login).
+  const startSession = (
+    res: Response,
+    rawDevice: Record<string, unknown>,
+    deviceId: string,
+    user: { customerId: string; username: string; status: string },
+  ) => {
+    const rawPlatform = rawDevice.platform;
+    const platform: RegisteredDevice['platform'] =
+      rawPlatform === 'android' || rawPlatform === 'ios' || rawPlatform === 'windows'
+        ? rawPlatform
+        : 'web';
+
+    store.registerDevice(user.customerId, {
+      deviceId,
+      deviceName:
+        typeof rawDevice.deviceName === 'string' && rawDevice.deviceName.trim()
+          ? rawDevice.deviceName.trim().slice(0, 64)
+          : 'Unknown Device',
+      platform,
+      appVersion:
+        typeof rawDevice.appVersion === 'string' && rawDevice.appVersion.trim()
+          ? rawDevice.appVersion.trim().slice(0, 24)
+          : '0.3.0',
+    });
+
+    const access = signAccessToken({
+      sub: user.customerId,
+      username: user.username,
+      deviceId,
+    });
+    const refresh = store.issueRefreshSession(user.customerId, user.username, deviceId);
+
+    res.json({
+      user: {
+        id: user.customerId,
+        username: user.username,
+        status: user.status,
+      },
+      tokens: {
+        accessToken: access.token,
+        refreshToken: refresh.refreshToken,
+        expiresAt: access.expiresAtMs,
+        tokenType: 'Bearer',
+      },
+      deviceId,
+      issuedAt: Date.now(),
+    });
   };
 
   // --- Public Discovery & Health ---
@@ -168,6 +229,46 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
     res.json(payload);
   });
 
+  // Password login that ends in a PasarGuard link (gateway account or reseller answer): the panel is
+  // the source of truth for status, servers and usage, exactly like link login.
+  const startLinkedSession = async (
+    res: Response,
+    rawDevice: Record<string, unknown>,
+    deviceId: string,
+    subscriptionUrl: string,
+  ) => {
+    let linkedLogin: Awaited<ReturnType<typeof authenticateWithLink>>;
+    try {
+      linkedLogin = await authenticateWithLink(pasarguard, store, subscriptionUrl);
+    } catch (err) {
+      if (err instanceof GatewayError && err.code === 'AUTH_LINK_INVALID') {
+        throw new GatewayError(
+          502,
+          'ACCOUNT_SUBSCRIPTION_MISMATCH',
+          'backend_unavailable',
+          'The stored subscription does not belong to a configured panel.',
+          'contact_support',
+        );
+      }
+      throw err;
+    }
+    const status = recordToCustomerStatus(linkedLogin.record);
+    if (status === 'suspended') {
+      throw new GatewayError(
+        403,
+        'AUTH_ACCOUNT_SUSPENDED',
+        'account_suspended',
+        'This account is suspended.',
+        'contact_support',
+      );
+    }
+    startSession(res, rawDevice, deviceId, {
+      customerId: linkedLogin.userId,
+      username: linkedLogin.record.username,
+      status,
+    });
+  };
+
   // --- Authentication Routes ---
   router.post('/auth/login', authRateLimit, async (req, res, next) => {
     try {
@@ -190,7 +291,20 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
         );
       }
 
-      // Delegate strictly to configured Reseller/PasarGuard adapter (never fake login when NOT_CONNECTED)
+      // 1) Accounts the gateway holds itself: password checked here, 3 wrong passwords lock it.
+      const local = await authenticateLocalAccount(store, username, password);
+      if (local) {
+        await startLinkedSession(res, rawDevice, deviceId, local.subscriptionUrl);
+        return;
+      }
+
+      // 2) Not a gateway account. With gateway accounts in use and no reseller configured,
+      //    answer exactly like a wrong password (same cost, same message).
+      if (reseller.connectionState !== 'CONNECTED' && store.countLocalAccounts() > 0) {
+        await rejectUnknownUser(password);
+      }
+
+      // 3) Otherwise delegate strictly to the configured Reseller adapter (never fake a login when NOT_CONNECTED)
       const customer = await reseller.authenticateEndUser(username, password);
       if (customer.status === 'suspended') {
         throw new GatewayError(
@@ -202,46 +316,58 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
         );
       }
 
-      const rawPlatform = rawDevice.platform;
-      const platform: RegisteredDevice['platform'] =
-        rawPlatform === 'android' || rawPlatform === 'ios' || rawPlatform === 'windows'
-          ? rawPlatform
-          : 'web';
+      // The reseller hands back the customer's PasarGuard link: from here on this is a linked
+      // account, so servers, usage and configs use the same pipeline as link login.
+      if (customer.subscriptionUrl) {
+        await startLinkedSession(res, rawDevice, deviceId, customer.subscriptionUrl);
+        return;
+      }
 
-      store.registerDevice(customer.customerId, {
-        deviceId,
-        deviceName:
-          typeof rawDevice.deviceName === 'string' && rawDevice.deviceName.trim()
-            ? rawDevice.deviceName.trim().slice(0, 64)
-            : 'Unknown Device',
-        platform,
-        appVersion:
-          typeof rawDevice.appVersion === 'string' && rawDevice.appVersion.trim()
-            ? rawDevice.appVersion.trim().slice(0, 24)
-            : '0.3.0',
-      });
-
-      const access = signAccessToken({
-        sub: customer.customerId,
+      startSession(res, rawDevice, deviceId, {
+        customerId: customer.customerId,
         username: customer.username,
-        deviceId,
+        status: customer.status,
       });
-      const refresh = store.issueRefreshSession(customer.customerId, customer.username, deviceId);
+    } catch (err) {
+      next(err);
+    }
+  });
 
-      res.json({
-        user: {
-          id: customer.customerId,
-          username: customer.username,
-          status: customer.status,
-        },
-        tokens: {
-          accessToken: access.token,
-          refreshToken: refresh.refreshToken,
-          expiresAt: access.expiresAtMs,
-          tokenType: 'Bearer',
-        },
-        deviceId,
-        issuedAt: Date.now(),
+  router.post('/auth/login-link', authRateLimit, async (req, res, next) => {
+    try {
+      const body = req.body as Record<string, unknown> | undefined;
+      const link = typeof body?.link === 'string' ? body.link.trim() : '';
+      const rawDevice = (body?.device as Record<string, unknown> | undefined) ?? {};
+      const deviceId =
+        typeof rawDevice.deviceId === 'string' && rawDevice.deviceId.trim().length >= 4
+          ? rawDevice.deviceId.trim()
+          : '';
+
+      if (!link || link.length > 2048 || !deviceId) {
+        throw new GatewayError(
+          400,
+          'AUTH_VALIDATION_FAILED',
+          'validation_error',
+          'A subscription link and deviceId are required.',
+          'verify_credentials',
+        );
+      }
+
+      const { userId, record } = await authenticateWithLink(pasarguard, store, link);
+      if (recordToCustomerStatus(record) === 'suspended') {
+        throw new GatewayError(
+          403,
+          'AUTH_ACCOUNT_SUSPENDED',
+          'account_suspended',
+          'This account is suspended.',
+          'contact_support',
+        );
+      }
+
+      startSession(res, rawDevice, deviceId, {
+        customerId: userId,
+        username: record.username,
+        status: recordToCustomerStatus(record),
       });
     } catch (err) {
       next(err);
@@ -315,6 +441,15 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
         );
       }
 
+      // Gateway-held accounts are reset by an admin; the answer never reveals whether the name exists.
+      if (store.getLocalAccount(normalizeUsername(username)) || (reseller.connectionState !== 'CONNECTED' && store.countLocalAccounts() > 0)) {
+        res.json({
+          delegated: false,
+          workflowMessage: 'Contact support or your reseller to reset the password or unlock the account.',
+        });
+        return;
+      }
+
       const result = await reseller.requestPasswordRecovery(username);
       res.json(result);
     } catch (err) {
@@ -325,7 +460,15 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
   // --- Authenticated User & Devices ---
   router.get('/user/me', requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
-      const profile = await reseller.getCustomerProfile(req.auth!.username);
+      const linked = getLinkedContext(pasarguard, store, req.auth!.sub);
+      const profile = linked
+        ? await linked.fetchRecord().then((record) => ({
+            customerId: req.auth!.sub,
+            username: record.username,
+            status: recordToCustomerStatus(record),
+            allowedDevices: null,
+          }))
+        : await reseller.getCustomerProfile(req.auth!.username);
       res.json({
         user: profile,
         devicesCount: store.listDevices(req.auth!.sub, req.auth!.deviceId).length,
@@ -367,9 +510,14 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
   router.get('/subscriptions', requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
       const { page, limit } = parsePagination(req);
-      const services = await reseller.getPurchasedServices(req.auth!.sub);
+      const linked = getLinkedContext(pasarguard, store, req.auth!.sub);
+      const linkedItems = linked
+        ? [recordToSubscription(await linked.fetchRecord(), linked.account.instanceId)]
+        : [];
+      const services = linked ? [] : await reseller.getPurchasedServices(req.auth!.sub);
       const imported = store.listImportedSubscriptions(req.auth!.sub);
       const combined = [
+        ...linkedItems,
         ...services.map((svc) => ({
           id: svc.serviceId,
           source: 'account' as const,
@@ -458,6 +606,14 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
       if (imported) {
         return res.json(imported);
       }
+      const linked = getLinkedContext(pasarguard, store, req.auth!.sub);
+      if (linked) {
+        const account = recordToSubscription(await linked.fetchRecord(), linked.account.instanceId);
+        if (account.id !== subId) {
+          throw new GatewayError(404, 'SUBSCRIPTION_NOT_FOUND', 'validation_error', 'Subscription not found.');
+        }
+        return res.json(account);
+      }
       const services = await reseller.getPurchasedServices(req.auth!.sub);
       const match = services.find((svc) => svc.serviceId === subId);
       if (!match) {
@@ -472,6 +628,10 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
   router.get('/subscriptions/:id/config', requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
       const subId = getParam(req, 'id');
+      const linked = getLinkedContext(pasarguard, store, req.auth!.sub);
+      if (linked) {
+        return res.json({ subscriptionId: subId, ...(await linked.fetchLinks()) });
+      }
       const instanceId = getQueryString(req, 'providerInstanceId') || 'default';
       const adapter = pasarguard.getAdapter(instanceId);
       const links = await adapter.getSubscriptionLinks(req.auth!.username);
@@ -484,9 +644,10 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
   router.post('/subscriptions/:id/refresh', requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
       const subId = getParam(req, 'id');
+      const linked = getLinkedContext(pasarguard, store, req.auth!.sub);
       const instanceId = getQueryString(req, 'providerInstanceId') || 'default';
       const adapter = pasarguard.getAdapter(instanceId);
-      const record = await adapter.getUserRecord(req.auth!.username);
+      const record = linked ? await linked.fetchRecord() : await adapter.getUserRecord(req.auth!.username);
       res.json({ subscriptionId: subId, refreshedAt: new Date().toISOString(), upstream: record });
     } catch (err) {
       next(err);
@@ -514,6 +675,12 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
   // --- Servers, Usage & Support ---
   router.get('/servers', requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
+      const linked = getLinkedContext(pasarguard, store, req.auth!.sub);
+      if (linked) {
+        const { rawLinks } = await linked.fetchLinks();
+        const items = linksToServers(rawLinks, `acct_${linked.account.instanceId}`);
+        return res.json({ items, total: items.length });
+      }
       const instanceId = getQueryString(req, 'providerInstanceId') || 'default';
       const adapter = pasarguard.getAdapter(instanceId);
       await adapter.getSubscriptionLinks(req.auth!.username);
@@ -547,7 +714,7 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
 
   const probeRateLimit = createRateLimiter('probe', 30, 60_000);
 
-  router.post('/servers/probe', probeRateLimit, async (req, res, next) => {
+  router.post('/servers/probe', requireAuth, probeRateLimit, async (req: AuthenticatedRequest, res, next) => {
     try {
       const body = req.body as { targets?: Array<{ id?: unknown; host?: unknown; port?: unknown }> } | undefined;
       const rawTargets = Array.isArray(body?.targets) ? body.targets : null;
@@ -606,8 +773,9 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
       const rawGranularity = getQueryString(req, 'granularity');
       const granularity =
         rawGranularity === '24h' || rawGranularity === '30d' ? rawGranularity : '7d';
+      const linked = getLinkedContext(pasarguard, store, req.auth!.sub);
       const adapter = pasarguard.getAdapter(instanceId);
-      const record = await adapter.getUserRecord(req.auth!.username);
+      const record = linked ? await linked.fetchRecord() : await adapter.getUserRecord(req.auth!.username);
       const history = Array.isArray(record.usageHistory)
         ? record.usageHistory.map((bucket) => {
             const downloadBytes = Math.max(0, Number(bucket.downloadBytes) || 0);
@@ -658,11 +826,28 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
     }
   });
 
+  // --- Unknown API routes ---
+  router.use((_req: Request, _res: Response, next: NextFunction) => {
+    next(new GatewayError(404, 'ROUTE_NOT_FOUND', 'validation_error', 'Unknown API route.'));
+  });
+
   // --- Centralized Error Envelope Handler ---
   router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof GatewayError) {
       return res.status(err.statusCode).json(err.toEnvelope());
     }
+
+    // body-parser errors (malformed JSON, oversized body) are client errors, not 500s.
+    const parserType = (err as { type?: string } | null)?.type;
+    if (parserType === 'entity.too.large') {
+      const tooLarge = new GatewayError(413, 'REQUEST_TOO_LARGE', 'validation_error', 'Request body is too large.');
+      return res.status(413).json(tooLarge.toEnvelope());
+    }
+    if (parserType === 'entity.parse.failed' || parserType === 'encoding.unsupported') {
+      const badBody = new GatewayError(400, 'REQUEST_BODY_INVALID', 'validation_error', 'Request body is not valid JSON.');
+      return res.status(400).json(badBody.toEnvelope());
+    }
+
     const fallback = new GatewayError(
       500,
       'GATEWAY_INTERNAL_ERROR',
@@ -670,6 +855,8 @@ export function createGatewayRouter(deps: GatewayDependencies = {}) {
       'Unexpected gateway error.',
       'retry_request',
     );
+    // Log server-side only; the client receives just the diagnosticId.
+    console.error(`[gateway] ${fallback.diagnosticId}`, err instanceof Error ? err.message : err);
     return res.status(500).json(fallback.toEnvelope());
   });
 

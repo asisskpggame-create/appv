@@ -7,6 +7,7 @@ export { Dialog } from './Dialog';
 export { Input } from './Input';
 export { LatencyIndicator, getLatencyTier } from './LatencyIndicator';
 export type { LatencyTier } from './LatencyIndicator';
+export { QuotaRing } from './QuotaRing';
 export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedOption } from './SegmentedControl';
 export {

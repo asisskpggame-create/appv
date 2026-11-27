@@ -1,9 +1,52 @@
+import crypto from 'node:crypto';
 import { GatewayError } from '../errors.ts';
 import type {
   IntegrationConnectionState,
   ResellerCustomerRecord,
   ResellerPurchasedService,
 } from '../types.ts';
+
+const RESELLER_TIMEOUT_MS = 8_000;
+const RESELLER_MAX_BYTES = 256 * 1024;
+
+function resellerUnavailable(message: string): GatewayError {
+  return new GatewayError(502, 'RESELLER_UPSTREAM_UNAVAILABLE', 'backend_unavailable', message, 'retry_later');
+}
+
+/** HMAC-SHA256 hex over `${timestamp}.${body}`; the receiver recomputes it and rejects old timestamps. */
+export function signResellerRequest(apiKey: string, timestamp: string, body: string): string {
+  return crypto.createHmac('sha256', apiKey).update(`${timestamp}.${body}`).digest('hex');
+}
+
+/** Maps the `/verify-login` JSON into a customer record; refuses answers it cannot trust. */
+export function mapVerifyLoginResponse(raw: unknown): ResellerCustomerRecord {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  if (o.ok === false) {
+    throw new GatewayError(
+      401,
+      'AUTH_INVALID_CREDENTIALS',
+      'authentication_failure',
+      'Invalid username or password.',
+      'verify_credentials',
+    );
+  }
+  const username = typeof o.username === 'string' ? o.username.trim() : '';
+  const subscriptionUrl = typeof o.subscription_url === 'string' ? o.subscription_url.trim() : '';
+  if (o.ok !== true || !username || !subscriptionUrl) {
+    throw resellerUnavailable('The account service answered in an unexpected format.');
+  }
+  const customerId =
+    typeof o.customer_id === 'string' || typeof o.customer_id === 'number' ? String(o.customer_id) : username;
+  const devices = typeof o.allowed_devices === 'number' && o.allowed_devices > 0 ? Math.floor(o.allowed_devices) : null;
+  return {
+    customerId,
+    username,
+    status: o.status === 'suspended' ? 'suspended' : 'active',
+    allowedDevices: devices,
+    ...(typeof o.renewal_url === 'string' && /^https:\/\//i.test(o.renewal_url) ? { renewalUrl: o.renewal_url } : {}),
+    subscriptionUrl,
+  };
+}
 
 export interface ResellerAdapter {
   readonly connectionState: IntegrationConnectionState;
@@ -80,7 +123,12 @@ export class HttpResellerAdapter implements ResellerAdapter {
     this.apiKey = apiKey;
   }
 
-  async authenticateEndUser(_username: string, _password: string): Promise<ResellerCustomerRecord> {
+  /**
+   * Password login is verified by the reseller system (e.g. the sales bot), never by PasarGuard.
+   * Contract (see RESELLER_INTEGRATION.md): POST {base}/verify-login, JSON {username, password},
+   * signed with HMAC-SHA256 over `${timestamp}.${body}` using the shared key.
+   */
+  async authenticateEndUser(username: string, password: string): Promise<ResellerCustomerRecord> {
     if (!this.baseUrl || !this.apiKey) {
       throw new GatewayError(
         503,
@@ -91,13 +139,60 @@ export class HttpResellerAdapter implements ResellerAdapter {
       );
     }
 
-    throw new GatewayError(
-      501,
-      'RESELLER_SCHEMA_PENDING',
-      'backend_unavailable',
-      'Reseller authentication endpoint mapping requires confirmed API schema in RESELLER_INTEGRATION.md.',
-      'provide_reseller_docs',
-    );
+    // `nonce` makes every signed body unique, so a receiver that refuses a repeated signature (replay
+    // protection) does not also refuse two real logins made in the same second.
+    const body = JSON.stringify({ username, password, nonce: crypto.randomBytes(16).toString('hex') });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = signResellerRequest(this.apiKey, timestamp, body);
+
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/verify-login`, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'User-Agent': 'ASiS-Gateway/0.4',
+          'X-ASiS-Timestamp': timestamp,
+          'X-ASiS-Signature': signature,
+        },
+        body,
+        signal: AbortSignal.timeout(RESELLER_TIMEOUT_MS),
+      });
+    } catch {
+      throw resellerUnavailable('The account service is unreachable.');
+    }
+
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      throw new GatewayError(
+        401,
+        'AUTH_INVALID_CREDENTIALS',
+        'authentication_failure',
+        'Invalid username or password.',
+        'verify_credentials',
+      );
+    }
+    if (res.status === 429) {
+      throw new GatewayError(
+        429,
+        'AUTH_RATE_LIMITED',
+        'rate_limited',
+        'Too many attempts. Try again later.',
+        'retry_later',
+      );
+    }
+    if (!res.ok) throw resellerUnavailable(`The account service answered with HTTP ${res.status}.`);
+
+    const text = await res.text();
+    if (text.length > RESELLER_MAX_BYTES) throw resellerUnavailable('The account service response is too large.');
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw resellerUnavailable('The account service response is not valid JSON.');
+    }
+    return mapVerifyLoginResponse(json);
   }
 
   async getCustomerProfile(_username: string): Promise<ResellerCustomerRecord> {

@@ -14,6 +14,16 @@ export interface AuthCopy {
   forgotPasswordLink: string;
   submitSignIn: string;
   submitSigningIn: string;
+  tabLink: string;
+  tabPassword: string;
+  tabsAriaLabel: string;
+  linkLabel: string;
+  linkPlaceholder: string;
+  linkHint: string;
+  validationLinkRequired: string;
+  validationLinkInvalid: string;
+  errorLinkTitle: string;
+  errorLinkBody: string;
   validationUsernameRequired: string;
   validationUsernameMin: string;
   validationUsernameFormat: string;
@@ -23,6 +33,8 @@ export interface AuthCopy {
   diagnosticIdLabel: string;
   errorInvalidCredentialsTitle: string;
   errorInvalidCredentialsBody: string;
+  errorLockedTitle: string;
+  errorLockedBody: string;
   errorSuspendedTitle: string;
   errorSuspendedBody: string;
   errorSessionExpiredTitle: string;
@@ -68,6 +80,16 @@ export const authTranslations: Record<LocaleCode, AuthCopy> = {
     forgotPasswordLink: 'Forgot password?',
     submitSignIn: 'Sign In',
     submitSigningIn: 'Signing in...',
+    tabLink: 'Subscription link',
+    tabPassword: 'Username & password',
+    tabsAriaLabel: 'Sign-in method',
+    linkLabel: 'Subscription link',
+    linkPlaceholder: 'https://sub.example.com/sub/...',
+    linkHint: 'Paste the subscription link you received from your provider.',
+    validationLinkRequired: 'Subscription link is required.',
+    validationLinkInvalid: 'Enter a full link starting with https://',
+    errorLinkTitle: 'Subscription link not accepted',
+    errorLinkBody: 'Check that you pasted the full link from your provider, then try again.',
     validationUsernameRequired: 'Username is required.',
     validationUsernameMin: 'Username must be at least 3 characters.',
     validationUsernameFormat:
@@ -79,6 +101,9 @@ export const authTranslations: Record<LocaleCode, AuthCopy> = {
     errorInvalidCredentialsTitle: 'Invalid credentials',
     errorInvalidCredentialsBody:
       'The username or password was rejected by the authentication service. Verify your input and try again.',
+    errorLockedTitle: 'Account locked',
+    errorLockedBody:
+      'The password was wrong 3 times, so this account is locked. Contact support or your reseller and ask them to unlock it.',
     errorSuspendedTitle: 'Account suspended',
     errorSuspendedBody:
       'This account is currently suspended. Please contact your service provider or reseller support.',
@@ -129,6 +154,16 @@ export const authTranslations: Record<LocaleCode, AuthCopy> = {
     forgotPasswordLink: 'فراموشی رمز عبور؟',
     submitSignIn: 'ورود به حساب',
     submitSigningIn: 'در حال احراز هویت...',
+    tabLink: 'لینک اشتراک',
+    tabPassword: 'نام کاربری و رمز',
+    tabsAriaLabel: 'روش ورود',
+    linkLabel: 'لینک اشتراک',
+    linkPlaceholder: 'https://sub.example.com/sub/...',
+    linkHint: 'لینک اشتراکی را که از فروشنده گرفته‌اید اینجا بچسبانید.',
+    validationLinkRequired: 'وارد کردن لینک اشتراک الزامی است.',
+    validationLinkInvalid: 'لینک کامل را با https:// وارد کنید.',
+    errorLinkTitle: 'لینک اشتراک پذیرفته نشد',
+    errorLinkBody: 'مطمئن شوید لینک کامل را از فروشنده کپی کرده‌اید و دوباره تلاش کنید.',
     validationUsernameRequired: 'وارد کردن نام کاربری الزامی است.',
     validationUsernameMin: 'نام کاربری باید حداقل ۳ کاراکتر باشد.',
     validationUsernameFormat:
@@ -140,6 +175,9 @@ export const authTranslations: Record<LocaleCode, AuthCopy> = {
     errorInvalidCredentialsTitle: 'نام کاربری یا رمز عبور نادرست است',
     errorInvalidCredentialsBody:
       'اطلاعات ورود توسط سرویس احراز هویت تایید نشد. ورودی خود را بررسی کرده و دوباره تلاش کنید.',
+    errorLockedTitle: 'حساب قفل شد',
+    errorLockedBody:
+      'رمز عبور ۳ بار اشتباه وارد شد و حساب قفل شده است. برای بازکردن آن با پشتیبانی یا فروشنده‌ی خود تماس بگیرید.',
     errorSuspendedTitle: 'حساب کاربری مسدود شده است',
     errorSuspendedBody:
       'این حساب در حال حاضر غیرفعال یا معلق است. لطفاً با پشتیبانی ارائه‌دهنده سرویس خود تماس بگیرید.',

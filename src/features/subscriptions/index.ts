@@ -1,4 +1,6 @@
 export { SubscriptionsView } from './SubscriptionsView';
+export { fetchAccountSubscriptions } from './accountSync';
+export type { AccountSyncResult } from './accountSync';
 export {
   computeFingerprintSha256,
   formatBytesCompact,

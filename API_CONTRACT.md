@@ -9,6 +9,7 @@ Base Path: `/api/v1`
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `POST` | `/auth/login` | Public | Exchange username + password + device metadata for short-lived access token & rotating refresh token |
+| `POST` | `/auth/login-link` | Public | Exchange a PasarGuard subscription link + device metadata for the same token pair (no password); the link must match a configured instance |
 | `POST` | `/auth/refresh` | Refresh Token | Rotate refresh token and issue new access token |
 | `POST` | `/auth/logout` | Bearer | Revoke current device session |
 | `POST` | `/auth/password-recovery` | Public | Delegate recovery request to existing reseller/panel workflow |
@@ -58,3 +59,17 @@ Base Path: `/api/v1`
 ```
 
 Every response avoids leaking upstream tokens, internal panel URLs, or raw subscription URLs.
+
+
+## 6. Admin endpoints (operator only)
+
+Disabled (404) unless `ADMIN_API_KEY` (>= 32 chars) is set. Send it as `X-Admin-Key`. Do not expose `/api/v1/admin/*` publicly.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `PUT` | `/admin/accounts/:username` | Body `{password (8-128), subscriptionUrl}`. Creates the account or replaces its password/link; clears any lock. `201` new, `200` updated. |
+| `GET` | `/admin/accounts/:username` | `{username, locked, failedAttempts, lockedAt, lastLoginAt, createdAt, updatedAt}` |
+| `POST` | `/admin/accounts/:username/unlock` | Clears the 3-strike lock. Optional body `{newPassword}` for a forgotten password. |
+| `DELETE` | `/admin/accounts/:username` | Removes the account (`204`). |
+
+Login lock: `POST /auth/login` answers `423 AUTH_ACCOUNT_LOCKED` once an account has had 3 wrong passwords; it stays locked (even for the right password) until an admin unlocks it.

@@ -16,9 +16,18 @@
    - iOS: `NEPacketTunnelProvider` startup, memory cap (`<= 50MB` extension limit), On-Demand rules.
    - Windows: `Wintun` interface lifecycle, elevated service IPC, DNS leak test, IPv6 leak test.
 
+### Current automated suites (`npm test`)
+- `tests/runTests.ts`: auth validation, protocol validator, SSRF guard, JWT/refresh reuse, gateway routes, link login (needs `express`).
+- `tests/engineTests.ts`: sing-box config, native bridge, auto-connect rules.
+- `tests/resellerTests.ts`: reseller `/verify-login` client (signature, mapping, error cases).
+- `tests/accountTests.ts`: password hashing, 3-strike lock, unlock, parallel guesses (in-memory and SQLite).
+- Gap: router wiring of the login paths and `/admin/*` have no HTTP-level test yet.
+
 ## 2. Mandatory Manual QA Scenarios
 
 - [ ] Login success, invalid credentials, suspended account, offline error
+- [ ] 3 wrong passwords -> locked; right password still refused; admin unlock (and unlock with new password) works
+- [ ] Auto-connect: first manual connect, enable the setting, fully close and reopen the app; also with the tunnel already running
 - [ ] Refresh token rotation & remote device revocation
 - [ ] Account subscription sync vs. manual URL / QR / file import & duplicate check
 - [ ] Expired subscription & traffic exhaustion handling

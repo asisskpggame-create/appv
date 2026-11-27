@@ -71,6 +71,29 @@ export interface EngineDiagnosticReport {
   checkedAt: string;
 }
 
+export interface NativeProbeTarget {
+  id: string;
+  host: string;
+  port: number;
+}
+
+export interface NativeProbeResult {
+  id: string;
+  /** TCP handshake time in ms; null when the connection failed. */
+  latencyMs: number | null;
+  available: boolean;
+  error?: string;
+}
+
+export interface TunnelStatus {
+  /** false when the core's local controller cannot be reached; delays are then empty. */
+  available: boolean;
+  /** Tag of the outbound carrying traffic: 'proxy' (single server) or 'node-N' (auto-switch group). */
+  active: string | null;
+  /** Last measured end-to-end delay in ms per tag (through the tunnel); null = test failed. */
+  delays: Record<string, number | null>;
+}
+
 export type SplitTunnelingRuleMode = 'exclude_selected' | 'include_selected';
 
 export type InstalledAppCategory =
@@ -99,6 +122,10 @@ export interface AdvancedConnectionPolicy {
   ipv6Mode: 'disable' | 'auto' | 'prefer';
   mtu: number;
   autoReconnect: boolean;
+  /** Connect to a group of servers and let sing-box's urltest pick the fastest. Default off. */
+  autoSwitch?: boolean;
+  /** Connect automatically when the app is opened (once per launch, after a first manual connection). Default off. */
+  autoConnect?: boolean;
   connectionTimeoutSec: number;
   protocolPreference: 'auto' | EngineProtocol;
   routingMode: 'rule' | 'global';
@@ -113,6 +140,12 @@ export interface VpnEngineAdapter {
   initialize(): Promise<void>;
   validateConfiguration(rawConfigOrUri: string): EngineValidationResult;
   connect(outbound: SanitizedOutboundConfig, policy: AdvancedConnectionPolicy): Promise<void>;
+  /** Auto-switch: 2+ servers, the core's urltest group chooses and re-chooses the fastest. */
+  connectGroup?(outbounds: SanitizedOutboundConfig[], policy: AdvancedConnectionPolicy): Promise<void>;
+  /** Reads the latest tunnel latency results; null when not supported (browser). */
+  getTunnelStatus?(): Promise<TunnelStatus | null>;
+  /** Forces a fresh test through the tunnel, then returns the status. */
+  runTunnelTest?(): Promise<TunnelStatus | null>;
   disconnect(): Promise<void>;
   restart(): Promise<void>;
   getConnectionState(): ConnectionState;

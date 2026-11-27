@@ -271,6 +271,24 @@ export function parseSubscriptionPayload(rawContent: string): {
   return { endpoints: [], formatDetected: 'unknown' };
 }
 
+/**
+ * Maps endpoint ids (`node_<line>`) to the full link of that line, for plain or
+ * Base64 URI lists. Used to connect later; the links hold credentials, so keep
+ * them in memory only (see engine/endpointLinks.ts).
+ */
+export function extractEndpointLinks(rawContent: string): Record<string, string> {
+  const trimmed = rawContent.trim();
+  if (!trimmed) return {};
+  const decoded = !trimmed.includes('://') ? tryDecodeBase64(trimmed) : null;
+  const lines = (decoded ?? trimmed).split(/\r?\n/);
+  const result: Record<string, string> = {};
+  lines.forEach((line, idx) => {
+    const parsed = parseSingleUriLine(line, idx);
+    if (parsed) result[parsed.id] = line.trim();
+  });
+  return result;
+}
+
 export function parseSubscriptionUserInfoHeader(headerValue: string): {
   usedBytes: number | null;
   totalBytes: number | null;

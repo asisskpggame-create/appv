@@ -30,23 +30,23 @@
 
   .dark {
     color-scheme: dark;
-    --asis-bg: #050811;
-    --asis-chrome: #080E1C;
-    --asis-surface: #0D1527;
-    --asis-surface-2: #131E36;
-    --asis-border: #1B2844;
-    --asis-border-strong: #2A3E66;
-    --asis-text-primary: #F3F6FC;
-    --asis-text-secondary: #94A8C7;
+    --asis-bg: #030816;
+    --asis-chrome: #050E24;
+    --asis-surface: #0A1630;
+    --asis-surface-2: #0F2147;
+    --asis-border: #153062;
+    --asis-border-strong: #23509C;
+    --asis-text-primary: #F3F8FF;
+    --asis-text-secondary: #9DB6DC;
     --asis-primary: #1D86FF;
     --asis-primary-hover: #3B98FF;
     --asis-primary-active: #0F6FE0;
-    --asis-primary-soft: #10213D;
-    --asis-primary-border: #214073;
-    --asis-accent-fg: #60A5FA;
+    --asis-primary-soft: #0D2349;
+    --asis-primary-border: #1F4C9C;
+    --asis-accent-fg: #5FB0FF;
     --asis-glow-rgb: 29, 134, 255;
-    --asis-skeleton-a: #131F39;
-    --asis-skeleton-b: #1D2E54;
+    --asis-skeleton-a: #0F2147;
+    --asis-skeleton-b: #1A3470;
     --asis-chart-primary: #3898FF;
     --asis-chart-secondary: #34D399;
   }
@@ -183,15 +183,54 @@
 .dark .asis-canvas-ambient {
   background-image:
     radial-gradient(
-      ellipse 78% 46% at 50% 0%,
-      rgba(var(--asis-glow-rgb), 0.14),
+      ellipse 80% 46% at 50% 0%,
+      rgba(var(--asis-glow-rgb), 0.22),
       transparent 72%
     ),
     radial-gradient(
-      rgba(148, 163, 184, 0.1) 1px,
+      ellipse 90% 40% at 50% 100%,
+      rgba(var(--asis-glow-rgb), 0.16),
+      transparent 75%
+    ),
+    radial-gradient(
+      rgba(120, 170, 255, 0.09) 1px,
       transparent 1px
-    );
-  background-size: 100% 100%, 24px 24px;
+    ),
+    linear-gradient(180deg, #030816 0%, #061433 55%, #030816 100%);
+  background-size: 100% 100%, 100% 100%, 24px 24px, 100% 100%;
+}
+
+/* Glass surface + neon edge utilities (dark theme look) */
+.dark .asis-glass {
+  background: linear-gradient(180deg, rgba(14, 32, 72, 0.72), rgba(7, 18, 44, 0.78));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.dark .asis-neon-edge {
+  border-color: rgba(var(--asis-glow-rgb), 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 22px -6px rgba(var(--asis-glow-rgb), 0.45);
+}
+
+.asis-neon-text {
+  text-shadow: 0 0 14px rgba(var(--asis-glow-rgb), 0.65);
+}
+
+.asis-logo-glow {
+  filter: drop-shadow(0 0 8px rgba(var(--asis-glow-rgb), 0.7));
+}
+
+/* Home hero: dotted globe glow (placeholder for a real world-map asset) */
+.asis-hero-map {
+  background-image:
+    radial-gradient(circle at 50% 38%, rgba(var(--asis-glow-rgb), 0.22), transparent 62%),
+    radial-gradient(rgba(var(--asis-glow-rgb), 0.35) 1.2px, transparent 1.4px);
+  background-size: 100% 100%, 14px 14px;
+  -webkit-mask-image: radial-gradient(ellipse 85% 70% at 50% 40%, #000 30%, transparent 78%);
+  mask-image: radial-gradient(ellipse 85% 70% at 50% 40%, #000 30%, transparent 78%);
+  opacity: 0.55;
 }
 
 @keyframes asis-shimmer {
@@ -268,5 +307,68 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- Native app feel (touch devices / Capacitor shell) ---------- */
+@layer base {
+  html,
+  body {
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    -webkit-touch-callout: none;
+    /* Keep content clear of the status bar / notch (0 on desktop). */
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  button,
+  a,
+  [role="button"],
+  summary,
+  label {
+    touch-action: manipulation;
+  }
+
+  /* Press feedback. Uses the individual `scale` property so it composes with
+     Tailwind translate/rotate utilities and motion's inline transforms. */
+  button:not(:disabled),
+  [role="button"] {
+    transition: scale 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  button:not(:disabled):active,
+  [role="button"]:active {
+    scale: 0.97;
+  }
+}
+
+@media (pointer: coarse) {
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Values people copy (IPs, links, codes) and form fields stay selectable. */
+  input,
+  textarea,
+  select,
+  pre,
+  code,
+  .font-mono,
+  .select-text,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  * {
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
   }
 }

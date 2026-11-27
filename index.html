@@ -2,7 +2,8 @@
 <html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#030816" />
     <title>ASiS VPN — Multi-Platform VPN Client</title>
     <meta name="description" content="ASiS VPN — Commercial multi-platform VPN client, gateway architecture, and bilingual RTL/LTR design system." />
     <meta property="og:title" content="ASiS VPN — Multi-Platform VPN Client" />
@@ -27,15 +28,46 @@
             document.documentElement.setAttribute('data-palette', palette);
           }
           var loc = localStorage.getItem('asis_locale_pref_v1');
-          if (loc === 'fa-IR') {
+          if (loc === 'fa-IR' || !loc) {
             document.documentElement.lang = 'fa-IR';
             document.documentElement.dir = 'rtl';
           }
         } catch (e) {}
       })();
     </script>
+    <style>
+      #boot-splash {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; align-items: center; justify-content: center;
+        background:
+          radial-gradient(ellipse 70% 45% at 50% 45%, rgba(29, 134, 255, 0.28), transparent 70%),
+          linear-gradient(180deg, #030816 0%, #061433 55%, #030816 100%);
+        transition: opacity 0.35s ease, visibility 0.35s ease;
+      }
+      html:not(.dark) #boot-splash { background: #F3F6FB; }
+      #boot-splash.hide { opacity: 0; visibility: hidden; }
+      #boot-splash svg {
+        width: 88px; height: 88px;
+        filter: drop-shadow(0 0 18px rgba(29, 134, 255, 0.8));
+        animation: boot-pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes boot-pulse { 0%, 100% { transform: scale(0.97); } 50% { transform: scale(1.04); } }
+      @media (prefers-reduced-motion: reduce) { #boot-splash svg { animation: none; } }
+    </style>
   </head>
   <body class="bg-[var(--asis-bg)] text-[var(--asis-text-primary)] antialiased selection:bg-[var(--asis-primary)]/20 selection:text-[var(--asis-accent-fg)]">
+    <div id="boot-splash" aria-hidden="true">
+      <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="boot-g" x1="6" y1="3" x2="30" y2="33" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#3B98FF" />
+            <stop offset="100%" stop-color="#0F6FE0" />
+          </linearGradient>
+        </defs>
+        <path d="M18 2.5L5 7.8V16.9C5 24.7 10.6 31.6 18 33.5C25.4 31.6 31 24.7 31 16.9V7.8L18 2.5Z" fill="url(#boot-g)" />
+        <path d="M18 9.2L11.6 24.8H14.8L16.1 21.3H19.9L21.2 24.8H24.4L18 9.2ZM17 18.7L18 15.8L19 18.7H17Z" fill="#FFFFFF" />
+      </svg>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

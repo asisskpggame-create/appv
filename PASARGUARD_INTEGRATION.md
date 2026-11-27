@@ -1,10 +1,16 @@
 # PasarGuard Integration Specification
 
-> **Status**: `NOT CONNECTED` — Awaiting real PasarGuard API documentation, version details, and sanitized payload samples from the system owner.
+> **Status**: subscription-link integration implemented (public `/sub/{token}` and `/sub/{token}/info`, Marzban-compatible). The admin-API part (`getUserRecord`, service token) is `NOT CONNECTED` and still needs the items in section 3.
 
 ## 1. Architectural Rule
 
 The ASiS VPN mobile/desktop clients **never** communicate directly with PasarGuard admin endpoints or store PasarGuard admin tokens. Only the server-side **ASiS Client API Gateway** communicates with PasarGuard instances through a versioned `PasarGuardAdapter` interface.
+
+## 1a. What works today (no admin token needed)
+
+- `POST /auth/login-link`, and password login (gateway accounts / reseller) both end here: the gateway extracts the token from a link that matches a configured instance (`parseSubscriptionLink`, SSRF-safe), reads `/info` (status, used/limit, expiry) and the link list from `/sub/{token}` (plain or Base64 URIs).
+- The token is stored server-side only (AES-GCM at rest in SQLite). The app never sees it.
+- Pending: admin-token features (create/renew users from the app).
 
 ## 2. Adapter Responsibilities
 

@@ -29,6 +29,8 @@ export interface ParsedEndpointSummary {
 export interface SubscriptionRecord {
   id: string;
   source: SubscriptionSource;
+  /** Gateway instance an account subscription comes from. */
+  providerInstanceId?: string;
   importMethod?: 'url' | 'clipboard' | 'qr' | 'file';
   name: string;
   type: SubscriptionType;

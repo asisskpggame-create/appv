@@ -53,6 +53,18 @@ export const OPENAPI_SPEC = {
         },
       },
     },
+    '/auth/login-link': {
+      post: {
+        summary: 'Authenticate with a PasarGuard subscription link (no password)',
+        responses: {
+          '200': { description: 'Verified user session and tokens' },
+          '400': { description: 'Link does not belong to a configured instance' },
+          '401': { description: 'Panel rejected the link' },
+          '403': { description: 'Account disabled' },
+          '502': { description: 'PasarGuard panel unreachable' },
+        },
+      },
+    },
     '/auth/refresh': {
       post: {
         summary: 'Rotate refresh token and issue fresh access token',
@@ -153,6 +165,7 @@ export const OPENAPI_SPEC = {
     '/servers/probe': {
       post: {
         summary: 'SSRF-guarded batch TCP reachability probe for user server nodes',
+        security: [{ bearerAuth: [] }],
         responses: { '200': { description: 'Measured gateway TCP latencies per target' } },
       },
     },

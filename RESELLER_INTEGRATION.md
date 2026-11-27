@@ -1,6 +1,22 @@
 # Existing Reseller System Integration Specification
 
-> **Status**: `NOT CONNECTED` — Awaiting Reseller API documentation and sanitized response schemas from the system owner.
+> **Status**: password login contract (`POST /verify-login`) implemented gateway-side; profile, purchased services and password recovery still pending. See section 0.
+
+## 0. Password login contract (implemented in the gateway)
+
+PasarGuard users have no password, so the **reseller system** (e.g. the sales bot) is the only thing that verifies one. It keeps a hash of an app-specific password per customer (argon2/bcrypt; never the panel or Telegram credentials).
+
+Gateway config: `RESELLER_BASE_URL` (e.g. `https://bot.example.com/asis`) and `RESELLER_API_KEY` (shared secret).
+
+Request: `POST {RESELLER_BASE_URL}/verify-login`
+- Headers: `Content-Type: application/json`, `X-ASiS-Timestamp: <unix seconds>`, `X-ASiS-Signature: hex(HMAC-SHA256(RESELLER_API_KEY, "<timestamp>.<raw body>"))`
+- Body: `{"username": "...", "password": "...", "nonce": "<32 hex chars, new per request>"}` (receivers may ignore `nonce`; it only keeps each signature unique so replay protection does not reject two real logins in the same second)
+- The receiver MUST recompute the signature over the raw body, compare in constant time and reject timestamps older than ~60 s. Use HTTPS only.
+
+Response `200`: `{"ok": true, "customer_id": "42", "username": "ali", "status": "active" | "suspended", "subscription_url": "https://panel/sub/<token>", "allowed_devices": 3, "renewal_url": "https://..."}`
+- `username` and `subscription_url` are required. `subscription_url` must belong to a PasarGuard instance configured in the gateway; the gateway then treats the user exactly like a link login (servers, usage, configs come from the panel).
+- Wrong username or password: HTTP `401` (or `{"ok": false}`); too many attempts: `429`. Do not say which of the two was wrong.
+- Anything else (timeout 8 s, 5xx, malformed JSON) is reported to the app as `RESELLER_UPSTREAM_UNAVAILABLE`, never as a login.
 
 ## 1. Architectural Rule
 

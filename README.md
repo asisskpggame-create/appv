@@ -33,3 +33,6 @@ npm run dev
 ```
 
 The development server runs on `http://localhost:3000`.
+
+### Gateway environment (see `.env.example`)
+`ASIS_JWT_SECRET` (32+ chars, required in production), `ASIS_DB_PATH` / `ASIS_DB_KEY` (SQLite store), PasarGuard instance settings, `RESELLER_BASE_URL` + `RESELLER_API_KEY` (optional reseller login), `ADMIN_API_KEY` (32+ chars, enables `/api/v1/admin/*`).

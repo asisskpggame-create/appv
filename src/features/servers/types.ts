@@ -8,13 +8,23 @@ export type SmartSelectionPolicy =
 export type LatencyMeasurementSource =
   | 'unavailable'
   | 'gateway_tcp_probe'
+  | 'phone_tcp_probe'
   | 'unsupported_protocol';
+
+/**
+ * direct: the client connects straight to the exit server.
+ * tunnel: the client connects to an entry server (e.g. inside Iran) that relays
+ * traffic to a foreign exit server. countryCode then describes the EXIT country.
+ */
+export type ServerRouteKind = 'direct' | 'tunnel';
 
 export interface ProbeResultEntry {
   latencyMs: number | null;
   available: boolean;
   error?: string;
   measuredAt: string;
+  /** Where the number came from; absent = gateway (older stored results). */
+  source?: LatencyMeasurementSource;
 }
 
 export interface ServerCatalogEntry {
@@ -38,6 +48,10 @@ export interface ServerCatalogEntry {
   probeLatencyMs: number | null;
   measurementSource: LatencyMeasurementSource;
   isCustom?: boolean;
+  /** Defaults to 'direct' when absent. */
+  route?: ServerRouteKind;
+  /** Country of the entry server for tunnel routes (what probeHost points at). */
+  entryCountryCode?: string | null;
 }
 
 export interface CustomServerEntry {
@@ -52,6 +66,8 @@ export interface CustomServerEntry {
   probeHost?: string;
   port: number | null;
   createdAt: string;
+  route?: ServerRouteKind;
+  entryCountryCode?: string | null;
 }
 
 export interface SmartSelectionOutcome {

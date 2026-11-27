@@ -1,19 +1,18 @@
 {
-  "name": "react-example",
+  "name": "asis-vpn",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.4.12",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "node server.ts",
+    "start": "NODE_ENV=production tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "node --test tests/runTests.ts"
+    "test": "node --test tests/runTests.ts tests/engineTests.ts tests/resellerTests.ts tests/accountTests.ts tests/gatewayHttpTests.ts tests/gatewayFlowTests.ts tests/authClientLockTests.ts tests/resellerReceiverTests.ts tests/resellerPythonReceiverTests.ts tests/lazyScreensTests.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "dotenv": "^17.2.3",
@@ -22,7 +21,9 @@
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "react-is": "^19.0.1",
     "recharts": "^3.11.1",
+    "tsx": "^4.21.0",
     "vite": "^8.3.0"
   },
   "devDependencies": {
@@ -30,10 +31,12 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.0",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.21.0",
     "typescript": "^7.0.2",
     "@types/express": "^4.17.21"
+  },
+  "engines": {
+    "node": ">=22.18.0"
   }
 }

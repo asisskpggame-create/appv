@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Power, ShieldCheck } from 'lucide-react';
 import type { ConnectionState } from '../../engine';
+import { tapHaptic } from '../../client/haptics';
 
 interface ConnectionButtonProps {
   connState: ConnectionState;
@@ -225,7 +226,10 @@ export function ConnectionButton({
         }}
         onPointerUp={() => setPressed(false)}
         onPointerCancel={() => setPressed(false)}
-        onClick={onToggle}
+        onClick={() => {
+          tapHaptic(18);
+          onToggle();
+        }}
         style={{
           transform: `translate3d(${orbTranslateX}px, ${orbTranslateY}px, 0) scale(${orbScale})`,
           boxShadow: isConnected

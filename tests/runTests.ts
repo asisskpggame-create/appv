@@ -5,12 +5,15 @@ import test from 'node:test';
 import express from 'express';
 import { validateAndParseOutbound } from '../src/engine/protocolValidator.ts';
 import { InMemoryGatewayStore } from '../src/gateway/adapters/gatewayStore.ts';
+import { SqliteGatewayStore } from '../src/gateway/adapters/sqliteGatewayStore.ts';
+import { authenticateWithLink, getLinkedContext, recordToSubscription } from '../src/gateway/linkedAccount.ts';
 import { NotConnectedPasarGuardAdapter, PasarGuardAdapterRegistry } from '../src/gateway/adapters/pasarguardAdapter.ts';
 import { NotConnectedResellerAdapter } from '../src/gateway/adapters/resellerAdapter.ts';
 import { GatewayError } from '../src/gateway/errors.ts';
 import { createGatewayRouter } from '../src/gateway/router.ts';
 import {
   assertSafeProbeTarget,
+  isBlockedIp,
   measureTcpLatencyMs,
   signAccessToken,
   validateSubscriptionImportUrl,
@@ -21,6 +24,7 @@ import {
   evaluateSmartSelection,
   getLatencyTier,
   inferCountryMetadata,
+  parseTunnelTag,
 } from '../src/features/servers/serverCatalogUtils.ts';
 import { parseSubscriptionPayload } from '../src/features/subscriptions/subscriptionParser.ts';
 import { validateCredentials } from '../src/features/auth/validation.ts';
@@ -590,16 +594,27 @@ test('measureTcpLatencyMs measures real TCP connect RTT and POST /servers/probe 
     assert.ok(addr && typeof addr === 'object');
     const probeUrl = `http://127.0.0.1:${addr.port}/api/v1/servers/probe`;
 
-    const emptyRes = await fetch(probeUrl, {
+    // Unauthenticated probing must be rejected (open port-scanner prevention).
+    const anonRes = await fetch(probeUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targets: [{ id: 'x', host: '1.1.1.1', port: 443 }] }),
+    });
+    assert.equal(anonRes.status, 401);
+
+    const { token: probeToken } = signAccessToken({ sub: 'cust_probe', username: 'probeuser', deviceId: 'device_probe_1' });
+    const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${probeToken}` };
+
+    const emptyRes = await fetch(probeUrl, {
+      method: 'POST',
+      headers: authHeaders,
       body: JSON.stringify({ targets: [] }),
     });
     assert.equal(emptyRes.status, 400);
 
     const tooManyRes = await fetch(probeUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({
         targets: Array.from({ length: 16 }, (_, idx) => ({
           id: `srv_${idx}`,
@@ -612,7 +627,7 @@ test('measureTcpLatencyMs measures real TCP connect RTT and POST /servers/probe 
 
     const ssrfRes = await fetch(probeUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({
         targets: [
           { id: 'srv_local', host: '127.0.0.1', port: 443 },
@@ -695,4 +710,253 @@ test('themeEngine dynamically toggles CSS variables across Azure, Emerald, and T
   assert.notEqual(azureDark['--asis-primary'], emeraldDark['--asis-primary']);
   assert.notEqual(emeraldDark['--asis-primary'], titaniumDark['--asis-primary']);
   assert.notEqual(azureDark['--asis-chart-primary'], titaniumDark['--asis-chart-primary']);
+});
+
+test('isBlockedIp blocks private, reserved, and IPv4-mapped IPv6 targets but allows public IPs', () => {
+  for (const ip of [
+    '127.0.0.1', '10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.1.1', '169.254.169.254',
+    '100.64.0.1', '0.0.0.0', '198.18.0.1', '224.0.0.1', '255.255.255.255',
+    '::1', '::', 'fe80::1', 'fd00::1', 'fc00::1',
+    '::ffff:127.0.0.1', '::ffff:172.16.0.1', '::ffff:100.64.0.1', '::ffff:7f00:1', '::ffff:a9fe:a9fe',
+    '64:ff9b::7f00:1', 'not-an-ip',
+  ]) {
+    assert.equal(isBlockedIp(ip), true, `${ip} should be blocked`);
+  }
+  for (const ip of ['1.1.1.1', '8.8.8.8', '93.184.216.34', '2606:4700:4700::1111', '::ffff:8.8.8.8']) {
+    assert.equal(isBlockedIp(ip), false, `${ip} should be allowed`);
+  }
+});
+
+test('validateSubscriptionImportUrl rejects embedded credentials', () => {
+  assert.throws(() => validateSubscriptionImportUrl('https://user:pass@sub.example.com/x'));
+});
+
+test('verifyAccessToken rejects tokens with a non-HS256 header', () => {
+  const { token } = signAccessToken({ sub: 'u1', username: 'user1', deviceId: 'dev12345' });
+  const [, body, sig] = token.split('.');
+  const noneHeader = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+  assert.throws(() => verifyAccessToken(`${noneHeader}.${body}.${sig}`));
+});
+
+test('SqliteGatewayStore keeps sessions across reopen and enforces rotation + revocation', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'asis-db-'));
+  const file = path.join(dir, 'asis.db');
+  const env = { ASIS_DB_KEY: 'k'.repeat(40) } as NodeJS.ProcessEnv;
+  try {
+    const a = new SqliteGatewayStore(file, env);
+    a.registerDevice('usr_1', { deviceId: 'dev_1', deviceName: 'Pixel', platform: 'android', appVersion: '0.3.2' });
+    const first = a.issueRefreshSession('usr_1', 'alice', 'dev_1');
+    a.close();
+
+    // Reopen: the refresh token still works (restart must not log users out).
+    const b = new SqliteGatewayStore(file, env);
+    assert.equal(b.listDevices('usr_1', 'dev_1').length, 1);
+    assert.equal(b.rotateRefreshToken(first.refreshToken, 'wrong_dev'), null);
+    const second = b.issueRefreshSession('usr_1', 'alice', 'dev_1');
+    const rotated = b.rotateRefreshToken(second.refreshToken, 'dev_1');
+    assert.ok(rotated);
+    // Replay of the old token revokes the whole family.
+    assert.equal(b.rotateRefreshToken(second.refreshToken, 'dev_1'), null);
+    assert.equal(b.rotateRefreshToken(rotated.refreshToken, 'dev_1'), null);
+
+    // Device revocation kills its sessions.
+    const third = b.issueRefreshSession('usr_1', 'alice', 'dev_1');
+    assert.equal(b.revokeDevice('usr_1', 'dev_1'), true);
+    assert.equal(b.isDeviceRevoked('usr_1', 'dev_1'), true);
+    assert.equal(b.rotateRefreshToken(third.refreshToken, 'dev_1'), null);
+    assert.equal(b.revokeDevice('usr_1', 'nope'), false);
+
+    // Imported subscriptions: dedupe, user scoping, encrypted at rest.
+    b.saveImportedSubscription({
+      id: 'imp_1', userId: 'usr_1', name: 'My sub', urlHash: 'h1',
+      sourceUrl: 'https://sub.example.com/secret-token',
+      createdAt: new Date().toISOString(), lastSyncedAt: new Date().toISOString(),
+    });
+    assert.equal(b.findImportedDuplicate('usr_1', 'h1')?.sourceUrl, 'https://sub.example.com/secret-token');
+    assert.equal(b.findImportedDuplicate('usr_2', 'h1'), undefined);
+    assert.equal(b.listImportedSubscriptions('usr_1').length, 1);
+    assert.equal(b.deleteImportedSubscription('usr_2', 'imp_1'), false);
+    assert.equal(b.deleteImportedSubscription('usr_1', 'imp_1'), true);
+    b.close();
+    assert.equal(fs.readFileSync(file).includes('secret-token'), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+test('PasarGuard subscription-link login: allowlist, info mapping, configs, persistence', async () => {
+  const TOKEN = 'abcDEF123456.signature_XYZ';
+  const seen: string[] = [];
+  const panel = http.createServer((req, res) => {
+    seen.push(String(req.url));
+    if (req.url === `/sub/${TOKEN}/info`) {
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({
+        username: 'alice', status: 'active', used_traffic: 2_147_483_648,
+        data_limit: 10_737_418_240, expire: 1_900_000_000, created_at: '2026-01-01T00:00:00Z',
+      }));
+    } else if (req.url === `/sub/${TOKEN}`) {
+      const uris = ['vless://u@de.example.com:443?security=tls#DE', 'trojan://p@nl.example.com:443#NL'].join('\n');
+      res.end(Buffer.from(uris).toString('base64'));
+    } else if (String(req.url).startsWith('/sub/redir')) {
+      res.statusCode = 302; res.setHeader('location', 'http://127.0.0.1:1/'); res.end();
+    } else { res.statusCode = 404; res.end('nope'); }
+  });
+  await new Promise<void>((r) => panel.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${(panel.address() as any).port}`;
+  try {
+    const registry = new PasarGuardAdapterRegistry([{ instanceId: 'primary', label: 'P', baseUrl: base }]);
+    const store = new InMemoryGatewayStore();
+
+    // Links outside the configured prefix are refused WITHOUT any upstream request (SSRF guard).
+    for (const bad of [
+      `http://127.0.0.1:9/sub/${TOKEN}`, `${base}/other/${TOKEN}`, `${base}/sub/`, `${base}/sub/a/b`,
+      `${base}/sub/short`, `http://user:pw@${base.slice(7)}/sub/${TOKEN}`, 'not a url', `file:///etc/passwd`,
+    ]) {
+      await assert.rejects(authenticateWithLink(registry, store, bad), (e: any) => e.code === 'AUTH_LINK_INVALID');
+    }
+    assert.equal(seen.length, 0);
+
+    // Valid link (with and without trailing /info or query string).
+    const login = await authenticateWithLink(registry, store, `${base}/sub/${TOKEN}?x=1`);
+    assert.equal(login.userId, 'pg:primary:alice');
+    assert.equal(login.record.usedTrafficBytes, 2_147_483_648);
+    assert.equal(login.record.dataLimitBytes, 10_737_418_240);
+    assert.equal(login.record.expiresAt, new Date(1_900_000_000 * 1000).toISOString());
+    assert.equal((await authenticateWithLink(registry, store, `${base}/sub/${TOKEN}/info`)).userId, login.userId);
+
+    const ctx = getLinkedContext(registry, store, login.userId)!;
+    assert.equal(ctx.account.subscriptionToken, TOKEN);
+    const sub = recordToSubscription(await ctx.fetchRecord(), 'primary');
+    assert.equal(sub.type, 'combined');
+    assert.equal(sub.remainingBytes, 10_737_418_240 - 2_147_483_648);
+    const links = await ctx.fetchLinks();
+    assert.equal(links.rawLinks.length, 2);
+    assert.ok(links.rawLinks[0].startsWith('vless://'));
+    assert.equal(getLinkedContext(registry, store, 'pg:primary:nobody'), null);
+
+    // Panel says 404 -> rejected link; redirects are never followed.
+    await assert.rejects(authenticateWithLink(registry, store, `${base}/sub/unknownTOKEN1234`), (e: any) => e.code === 'AUTH_LINK_REJECTED');
+    await assert.rejects(authenticateWithLink(registry, store, `${base}/sub/redirect12345`), (e: any) => e.code === 'PASARGUARD_UPSTREAM_UNAVAILABLE' || e.code === 'AUTH_LINK_REJECTED');
+
+    // SQLite keeps the linked account across restart, token encrypted at rest.
+    const fs = await import('node:fs'); const os = await import('node:os'); const path = await import('node:path');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'asis-link-'));
+    const file = path.join(dir, 'a.db');
+    const env = { ASIS_DB_KEY: 'k'.repeat(40) } as NodeJS.ProcessEnv;
+    try {
+      const s1 = new SqliteGatewayStore(file, env);
+      await authenticateWithLink(registry, s1, `${base}/sub/${TOKEN}`);
+      s1.close();
+      const s2 = new SqliteGatewayStore(file, env);
+      assert.equal(s2.getLinkedAccount('pg:primary:alice')?.subscriptionToken, TOKEN);
+      s2.close();
+      assert.equal(fs.readFileSync(file).includes(TOKEN), false);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  } finally { panel.close(); }
+});
+
+test('PasarGuard subscription-link login: panel down -> 502, not-configured -> invalid link', async () => {
+  const registry = new PasarGuardAdapterRegistry([{ instanceId: 'primary', label: 'P', baseUrl: 'http://127.0.0.1:1' }]);
+  await assert.rejects(
+    authenticateWithLink(registry, new InMemoryGatewayStore(), 'http://127.0.0.1:1/sub/abcdefgh12345'),
+    (e: any) => e.statusCode === 502 && e.code === 'PASARGUARD_UPSTREAM_UNAVAILABLE',
+  );
+  await assert.rejects(
+    authenticateWithLink(new PasarGuardAdapterRegistry([]), new InMemoryGatewayStore(), 'https://x.example.com/sub/abcdefgh12345'),
+    (e: any) => e.code === 'AUTH_LINK_INVALID',
+  );
+});
+
+test('linksToServers builds a server list without hosts or credentials', async () => {
+  const { linksToServers } = await import('../src/gateway/linkedAccount.ts');
+  const items = linksToServers(['vless://uuid@de.example.com:443?security=tls#DE%20Berlin', 'trojan://pw@nl.example.com:443'], 'acct_primary');
+  assert.equal(items.length, 2);
+  assert.equal(items[0].name, 'DE Berlin');
+  assert.deepEqual(items[0].protocols, ['vless']);
+  assert.equal(items[1].name, 'TROJAN Node 2');
+  assert.equal(items[0].id, 'acct_primary:0');
+  assert.equal(JSON.stringify(items).includes('example.com'), false);
+  assert.equal(JSON.stringify(items).includes('uuid'), false);
+});
+
+
+test('parseTunnelTag detects explicit tunnel markers only', () => {
+  assert.deepEqual(parseTunnelTag('Fast [TUN IR>DE]'), {
+    entryCountryCode: 'IR',
+    exitCountryCode: 'DE',
+    cleanName: 'Fast',
+  });
+  assert.equal(parseTunnelTag('[tunnel ir->nl] Node 2')?.exitCountryCode, 'NL');
+  assert.equal(parseTunnelTag('[TUN DE]')?.entryCountryCode, 'IR');
+  assert.equal(parseTunnelTag('Iran Direct Node'), null);
+  assert.equal(parseTunnelTag('Germany TUN'), null);
+});
+
+test('evaluateExit flags Iranian exit IP for a foreign server and accepts a match', async () => {
+  const { evaluateExit } = await import('../src/features/home/exitCheck.ts');
+  const exit = (countryCode: string | null) => ({ ip: '203.0.113.9', countryCode, source: 'ipwho.is' as const });
+  assert.equal(evaluateExit({ countryCode: 'DE' }, exit('DE')), 'ok');
+  assert.equal(evaluateExit({ countryCode: 'DE' }, exit('IR')), 'leak');
+  assert.equal(evaluateExit({ countryCode: 'DE' }, exit('NL')), 'mismatch');
+  assert.equal(evaluateExit({ countryCode: 'IR' }, exit('IR')), 'ok');
+  assert.equal(evaluateExit({ countryCode: 'DE' }, exit(null)), 'unknown');
+  assert.equal(evaluateExit({ countryCode: null }, exit('DE')), 'unknown');
+  assert.equal(evaluateExit({ countryCode: 'DE' }, null), 'unknown');
+});
+
+
+test('probeFromPhone normalises native results and falls back to null without the bridge', async () => {
+  const { probeFromPhone } = await import('../src/features/servers/phoneProbe.ts');
+  const g = globalThis as unknown as { window?: unknown };
+  const saved = g.window;
+  try {
+    g.window = undefined;
+    assert.equal(await probeFromPhone([{ id: 'a', host: '1.2.3.4', port: 443 }]), null);
+
+    g.window = {
+      AsisNativeBridge: {
+        tcpProbe: async () => [
+          { id: 'a', latencyMs: 41.6, available: true },
+          { id: 'b', latencyMs: null, available: false, error: 'timeout' },
+          { id: 'c', latencyMs: -5, available: true },
+          { id: 'zzz', latencyMs: 10, available: true },
+        ],
+      },
+    };
+    const out = await probeFromPhone([
+      { id: 'a', host: '1.2.3.4', port: 443 },
+      { id: 'b', host: '5.6.7.8', port: 443 },
+      { id: 'c', host: '9.9.9.9', port: 443 },
+    ]);
+    assert.deepEqual(out, [
+      { id: 'a', available: true, latencyMs: 42 },
+      { id: 'b', available: false, latencyMs: null, error: 'timeout' },
+      { id: 'c', available: false, latencyMs: null, error: 'unreachable' },
+    ]);
+
+    g.window = { AsisNativeBridge: { tcpProbe: async () => { throw new Error('boom'); } } };
+    assert.equal(await probeFromPhone([{ id: 'a', host: '1.2.3.4', port: 443 }]), null);
+  } finally {
+    g.window = saved;
+  }
+});
+
+test('catalog keeps the probe source (phone vs gateway)', () => {
+  const sub = {
+    id: 's1', name: 'S', status: 'active',
+    endpoints: [{ id: 'a', name: 'DE 1', protocol: 'VLESS', supported: true, hostRedacted: 'x', probeHost: '1.2.3.4', port: 443, countryHint: null }],
+  } as unknown as Parameters<typeof buildServerCatalogFromSubscriptions>[0][number];
+  const phone = buildServerCatalogFromSubscriptions([sub], [], {
+    's1:a': { latencyMs: 40, available: true, measuredAt: 'now', source: 'phone_tcp_probe' },
+  });
+  assert.equal(phone[0].measurementSource, 'phone_tcp_probe');
+  const legacy = buildServerCatalogFromSubscriptions([sub], [], {
+    's1:a': { latencyMs: 40, available: true, measuredAt: 'now' },
+  });
+  assert.equal(legacy[0].measurementSource, 'gateway_tcp_probe');
 });

@@ -6,8 +6,11 @@ import type {
   EngineValidationResult,
   InstalledAppEntry,
   LocalEngineStatistics,
+  NativeProbeResult,
+  NativeProbeTarget,
   SanitizedOutboundConfig,
   TargetPlatform,
+  TunnelStatus,
   VpnEngineAdapter,
 } from './types.ts';
 
@@ -20,6 +23,9 @@ declare global {
       getState(): Promise<ConnectionState>;
       getStats(): Promise<LocalEngineStatistics>;
       getInstalledApplications?: () => Promise<InstalledAppEntry[]>;
+      getTunnelStatus?: () => Promise<TunnelStatus>;
+      runTunnelTest?: () => Promise<TunnelStatus>;
+      tcpProbe?: (targets: NativeProbeTarget[], timeoutMs: number) => Promise<NativeProbeResult[]>;
     };
   }
 }
@@ -68,6 +74,25 @@ export class AsisVpnEngineAdapter implements VpnEngineAdapter {
   }
 
   async connect(outbound: SanitizedOutboundConfig, policy: AdvancedConnectionPolicy): Promise<void> {
+    return this.connectAny([outbound], policy);
+  }
+
+  async connectGroup(outbounds: SanitizedOutboundConfig[], policy: AdvancedConnectionPolicy): Promise<void> {
+    return this.connectAny(outbounds, policy);
+  }
+
+  async getTunnelStatus(): Promise<TunnelStatus | null> {
+    if (typeof window === 'undefined' || typeof window.AsisNativeBridge?.getTunnelStatus !== 'function') return null;
+    return window.AsisNativeBridge.getTunnelStatus();
+  }
+
+  async runTunnelTest(): Promise<TunnelStatus | null> {
+    if (typeof window === 'undefined' || typeof window.AsisNativeBridge?.runTunnelTest !== 'function') return null;
+    return window.AsisNativeBridge.runTunnelTest();
+  }
+
+  private async connectAny(outbounds: SanitizedOutboundConfig[], policy: AdvancedConnectionPolicy): Promise<void> {
+    const outbound = outbounds[0];
     this.currentOutbound = outbound;
     this.state = 'Preparing';
     this.lastErrorCode = null;
@@ -77,7 +102,9 @@ export class AsisVpnEngineAdapter implements VpnEngineAdapter {
       this.state = 'Connecting';
       try {
         await window.AsisNativeBridge.connect(
-          JSON.stringify(outbound.singBoxOutbound),
+          JSON.stringify(
+            outbounds.length === 1 ? outbound.singBoxOutbound : outbounds.map((o) => o.singBoxOutbound),
+          ),
           JSON.stringify(policy),
         );
         const confirmedState = await window.AsisNativeBridge.getState();
@@ -85,8 +112,14 @@ export class AsisVpnEngineAdapter implements VpnEngineAdapter {
         return;
       } catch (err) {
         this.state = 'Error';
-        this.lastErrorCode = 'ENGINE_NATIVE_CONNECT_FAILED';
-        this.lastErrorMessage = err instanceof Error ? err.message : 'Native VPN connection failed.';
+        const nativeCode = (err as { code?: unknown } | null)?.code;
+        this.lastErrorCode =
+          typeof nativeCode === 'string' && nativeCode.startsWith('ENGINE_')
+            ? nativeCode
+            : 'ENGINE_NATIVE_CONNECT_FAILED';
+        const nativeMessage = (err as { message?: unknown } | null)?.message;
+        this.lastErrorMessage =
+          typeof nativeMessage === 'string' && nativeMessage ? nativeMessage : 'Native VPN connection failed.';
         throw new EngineRuntimeError(this.lastErrorCode, this.lastErrorMessage);
       }
     }

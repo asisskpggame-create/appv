@@ -12,6 +12,7 @@ import {
 import { usePreferences } from '../../design-system/ThemeContext';
 import {
   Button,
+  QuotaRing,
   Card,
   Dialog,
   EmptyState,
@@ -21,12 +22,15 @@ import {
   SubscriptionListSkeleton,
 } from '../../design-system/components';
 import type { AuthSession } from '../auth';
+import { registerEndpointLinks } from '../../engine/endpointLinks';
 import {
   computeFingerprintSha256,
   formatBytesCompact,
+  extractEndpointLinks,
   parseSubscriptionPayload,
   validateManualSubscriptionUrl,
 } from './subscriptionParser';
+import { fetchAccountSubscriptions } from './accountSync';
 import { subscriptionTranslations } from './subscriptionTranslations';
 import type { SubscriptionRecord } from './types';
 
@@ -188,6 +192,7 @@ export function SubscriptionsView({
         renewalAvailable: false,
       };
 
+      if (trimmedPayload) registerEndpointLinks(id, extractEndpointLinks(trimmedPayload));
       onSubscriptionsChange((prev) => [entry, ...prev]);
       handleSelect(entry);
       setNameInput('');
@@ -279,71 +284,16 @@ export function SubscriptionsView({
     setAccountSyncError(null);
     setAccountSyncCompleted(false);
     try {
-      const headers: Record<string, string> = { Accept: 'application/json' };
-      if (session?.tokens.accessToken) {
-        headers.Authorization = `Bearer ${session.tokens.accessToken}`;
-      }
-      const res = await fetch('/api/v1/subscriptions', { headers });
-      const body = (await res.json().catch(() => ({}))) as {
-        items?: Array<{
-          id?: string;
-          source?: 'account' | 'manual_import';
-          providerInstanceId?: string;
-          name?: string;
-          type?: SubscriptionRecord['type'];
-          status?: SubscriptionRecord['status'];
-          totalBytes?: number | null;
-          usedBytes?: number | null;
-          remainingBytes?: number | null;
-          startsAt?: string | null;
-          expiresAt?: string | null;
-          allowedDevices?: number | null;
-          locations?: string[];
-          lastSyncedAt?: string;
-          renewalInfo?: { available?: boolean };
-        }>;
-        error?: { code?: string; message?: string };
-      };
-      if (!res.ok) {
-        setAccountSyncError(
-          body.error?.message
-            ? `${body.error.code ?? 'GATEWAY_ERROR'}: ${body.error.message}`
-            : t.accountNotConnectedBody,
-        );
+      const result = await fetchAccountSubscriptions(session?.tokens.accessToken ?? '');
+      if (!result.ok) {
+        setAccountSyncError(result.message ?? t.accountNotConnectedBody);
         return;
       }
-
-      if (Array.isArray(body.items)) {
-        const syncedAccountSubs: SubscriptionRecord[] = body.items
-          .filter((item) => item.source === 'account' && typeof item.id === 'string')
-          .map((item) => ({
-            id: item.id!,
-            source: 'account',
-            providerInstanceId: item.providerInstanceId,
-            name: item.name || 'ASiS Subscription',
-            type: item.type ?? 'combined',
-            status: item.status ?? 'active',
-            fingerprintHash: `acct_${item.id}`,
-            totalBytes: item.totalBytes ?? null,
-            usedBytes: item.usedBytes ?? null,
-            remainingBytes: item.remainingBytes ?? null,
-            startsAt: item.startsAt ?? null,
-            expiresAt: item.expiresAt ?? null,
-            allowedDevices: item.allowedDevices ?? null,
-            locations: Array.isArray(item.locations) ? item.locations : [],
-            endpoints: [],
-            lastSyncedAt: item.lastSyncedAt ?? new Date().toISOString(),
-            renewalAvailable: Boolean(item.renewalInfo?.available),
-          }));
-
-        onSubscriptionsChange((prev) => [
-          ...syncedAccountSubs,
-          ...prev.filter((s) => s.source !== 'account'),
-        ]);
-        setAccountSyncCompleted(true);
-      }
-    } catch {
-      setAccountSyncError(t.accountNotConnectedBody);
+      onSubscriptionsChange((prev) => [
+        ...result.subscriptions,
+        ...prev.filter((s) => s.source !== 'account'),
+      ]);
+      setAccountSyncCompleted(true);
     } finally {
       setAccountSyncLoading(false);
     }
@@ -671,6 +621,49 @@ export function SubscriptionsView({
                       </div>
                     </div>
 
+                    {sub.totalBytes !== null && sub.totalBytes > 0 && sub.usedBytes !== null && (
+                      <div className="flex flex-col items-center gap-4 rounded-2xl border border-[var(--asis-primary-border)] bg-[var(--asis-primary-soft)]/40 p-5 sm:flex-row sm:justify-around">
+                        <QuotaRing
+                          percent={Math.round((sub.usedBytes / sub.totalBytes) * 100)}
+                          caption={locale === 'fa-IR' ? 'مصرف شده' : 'used'}
+                        />
+                        <div className="space-y-2 text-center text-sm sm:text-start">
+                          <p>
+                            <span className="text-[var(--asis-text-secondary)]">
+                              {locale === 'fa-IR' ? 'باقی‌مانده: ' : 'Remaining: '}
+                            </span>
+                            <span className="font-mono font-semibold">
+                              {formatBytesCompact(sub.remainingBytes, t.unavailable)}
+                            </span>
+                          </p>
+                          <p>
+                            <span className="text-[var(--asis-text-secondary)]">
+                              {locale === 'fa-IR' ? 'تاریخ انقضا: ' : 'Expires: '}
+                            </span>
+                            <span className="font-mono font-semibold">
+                              {sub.expiresAt
+                                ? new Date(sub.expiresAt).toLocaleDateString(locale)
+                                : t.unavailable}
+                            </span>
+                          </p>
+                          {sub.renewalAvailable &&
+                            typeof sub.renewalUrl === 'string' &&
+                            sub.renewalUrl.startsWith('https://') && (
+                              <Button
+                                variant="primary"
+                                size="md"
+                                className="w-full"
+                                onClick={() =>
+                                  window.open(sub.renewalUrl as string, '_blank', 'noopener,noreferrer')
+                                }
+                              >
+                                {locale === 'fa-IR' ? 'تمدید اشتراک' : 'Renew subscription'}
+                              </Button>
+                            )}
+                        </div>
+                      </div>
+                    )}
+
                     {isExpired && (
                       <StatusBanner
                         tone="warning"
@@ -704,7 +697,7 @@ export function SubscriptionsView({
                       <div>
                         <p className="text-[var(--asis-text-secondary)]">{t.detailStartDate}</p>
                         <p className="mt-0.5 font-mono">
-                          {sub.startsAt ? new Date(sub.startsAt).toLocaleDateString() : t.unavailable}
+                          {sub.startsAt ? new Date(sub.startsAt).toLocaleDateString(locale) : t.unavailable}
                         </p>
                       </div>
                       <div>
@@ -713,7 +706,7 @@ export function SubscriptionsView({
                         </p>
                         <p className="mt-0.5 font-mono">
                           {sub.expiresAt
-                            ? new Date(sub.expiresAt).toLocaleDateString()
+                            ? new Date(sub.expiresAt).toLocaleDateString(locale)
                             : t.unavailable}
                         </p>
                       </div>
